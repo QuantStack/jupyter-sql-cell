@@ -1,0 +1,8 @@
+{
+  "jupyter.lab.shortcuts": [],
+  "title": "@jupyter/sql-cell",
+  "description": "@jupyter/sql-cell settings.",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
