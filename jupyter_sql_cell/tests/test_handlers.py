@@ -11,3 +11,16 @@ async def test_get_example(jp_fetch):
     assert payload == {
         "data": "This is /jupyter-sql-cell/get-example endpoint!"
     }
+
+async def test_execute(jp_fetch):
+    response = await jp_fetch(
+        "jupyter-sql-cell",
+        "execute",
+        params={"query": "SELECT Abbreviation FROM world WHERE Country='France'"}
+    )
+
+    assert response.code == 200
+    payload = json.loads(response.body)
+    assert payload == {
+        "data": [{"Abbreviation": "FR"}]
+    }
