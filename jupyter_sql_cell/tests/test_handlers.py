@@ -16,7 +16,8 @@ async def test_execute(jp_fetch):
     response = await jp_fetch(
         "jupyter-sql-cell",
         "execute",
-        params={"query": "SELECT Abbreviation FROM world WHERE Country='France'"}
+        body=json.dumps({"query": "SELECT Abbreviation FROM world WHERE Country='France'"}),
+        method="POST"
     )
 
     assert response.code == 200

@@ -12,8 +12,8 @@ class ExecuteHandler(JupyterHandler):
     # Jupyter server
     @tornado.gen.coroutine
     @tornado.web.authenticated
-    def get(self):
-        query = self.get_argument("query")
+    def post(self):
+        query = json.loads(self.request.body).get("query", None)
 
         try:
             connector = SQLConnector()
