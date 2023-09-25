@@ -1,4 +1,12 @@
 {
+  "jupyter.lab.toolbars": {
+    "Notebook": [
+      {
+        "name": "SqlWidget",
+        "rank": 50
+      }
+    ]
+  },
   "jupyter.lab.shortcuts": [],
   "title": "@jupyter/sql-cell",
   "description": "@jupyter/sql-cell settings.",
