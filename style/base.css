@@ -10,7 +10,7 @@
   align-items: center;
 }
 
-.sql-cell-widget[aria-disabled="true"] span:first-child {
+.sql-cell-widget[aria-disabled='true'] span:first-child {
   color: var(--jp-ui-font-color3);
 }
 
@@ -20,7 +20,6 @@
   align-content: center;
   flex-wrap: wrap;
   height: 100%;
-
 }
 
 /* Hide default HTML checkbox */
@@ -35,20 +34,20 @@
   cursor: pointer;
   height: 15px;
   width: 30px;
-  background-color:var(--jp-layout-color3);
-  -webkit-transition: .4s;
-  transition: .4s;
+  background-color: var(--jp-layout-color3);
+  -webkit-transition: 0.4s;
+  transition: 0.4s;
   border-radius: 15px;
 }
 
-.sql-cell-widget .slider:before {
+.sql-cell-widget .slider::before {
   display: block;
-  content: "";
+  content: '';
   height: 15px;
   width: 15px;
   background-color: white;
-  -webkit-transition: .4s;
-  transition: .4s;
+  -webkit-transition: 0.4s;
+  transition: 0.4s;
   border-radius: 50%;
 }
 
@@ -65,12 +64,13 @@
   cursor: not-allowed;
 }
 
-.sql-cell-widget input:checked + .slider:before {
+.sql-cell-widget input:checked + .slider::before {
   -webkit-transform: translateX(15px);
   -ms-transform: translateX(15px);
   transform: translateX(15px);
 }
 
+/* stylelint-disable-next-line selector-class-pattern */
 .sql-cell-widget .jp-ToolbarButtonComponent {
   height: 22px;
 }
