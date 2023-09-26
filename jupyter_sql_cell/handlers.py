@@ -1,10 +1,37 @@
 import json
 
 from jupyter_server.base.handlers import APIHandler
-from jupyter_server.utils import url_path_join
 import tornado
 
-class RouteHandler(APIHandler):
+from .sqlconnector import SQLConnector
+
+
+class ExecuteHandler(APIHandler):
+    # The following decorator should be present on all verb methods (head, get, post,
+    # patch, put, delete, options) to ensure only authorized user can request the
+    # Jupyter server
+    @tornado.gen.coroutine
+    @tornado.web.authenticated
+    def post(self):
+        query = json.loads(self.request.body).get("query", None)
+
+        try:
+            connector = SQLConnector()
+        except Exception as e:
+            self.log.error(f"Connector error\n{e}")
+            self.write_error(500, exec_info=e)
+
+        try:
+            result = yield connector.execute(query)
+            self.finish(json.dumps({
+                "data": result
+            }))
+        except Exception as e:
+            self.log.error(f"Query error\n{e}")
+            self.write_error(500, exec_info=e)
+
+
+class ExampleHandler(APIHandler):
     # The following decorator should be present on all verb methods (head, get, post,
     # patch, put, delete, options) to ensure only authorized user can request the
     # Jupyter server
@@ -13,12 +40,3 @@ class RouteHandler(APIHandler):
         self.finish(json.dumps({
             "data": "This is /jupyter-sql-cell/get-example endpoint!"
         }))
-
-
-def setup_handlers(web_app):
-    host_pattern = ".*$"
-
-    base_url = web_app.settings["base_url"]
-    route_pattern = url_path_join(base_url, "jupyter-sql-cell", "get-example")
-    handlers = [(route_pattern, RouteHandler)]
-    web_app.add_handlers(host_pattern, handlers)
