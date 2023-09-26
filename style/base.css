@@ -3,3 +3,74 @@
 
     https://jupyterlab.readthedocs.io/en/stable/developer/css.html
 */
+
+.sql-cell-widget {
+  display: flex;
+  border: solid 1px;
+  align-items: center;
+}
+
+.sql-cell-widget[aria-disabled='true'] span:first-child {
+  color: var(--jp-ui-font-color3);
+}
+
+.sql-cell-widget .switch {
+  display: flex;
+  justify-content: center;
+  align-content: center;
+  flex-wrap: wrap;
+  height: 100%;
+}
+
+/* Hide default HTML checkbox */
+.sql-cell-widget .switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* The slider */
+.sql-cell-widget .slider {
+  cursor: pointer;
+  height: 15px;
+  width: 30px;
+  background-color: var(--jp-layout-color3);
+  -webkit-transition: 0.4s;
+  transition: 0.4s;
+  border-radius: 15px;
+}
+
+.sql-cell-widget .slider::before {
+  display: block;
+  content: '';
+  height: 15px;
+  width: 15px;
+  background-color: white;
+  -webkit-transition: 0.4s;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+.sql-cell-widget input:checked + .slider {
+  background-color: var(--md-blue-500);
+}
+
+.sql-cell-widget input:focus + .slider {
+  box-shadow: 0 0 1px var(--md-blue-500);
+}
+
+.sql-cell-widget input:disabled + .slider {
+  background-color: var(--jp-layout-color2);
+  cursor: not-allowed;
+}
+
+.sql-cell-widget input:checked + .slider::before {
+  -webkit-transform: translateX(15px);
+  -ms-transform: translateX(15px);
+  transform: translateX(15px);
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.sql-cell-widget .jp-ToolbarButtonComponent {
+  height: 22px;
+}
