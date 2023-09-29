@@ -10,6 +10,8 @@ import { CommandRegistry } from '@lumino/commands';
 import { Signal } from '@lumino/signaling';
 import * as React from 'react';
 
+export const METADATA_SQL_FORMAT = 'application/sql';
+
 export class SqlWidget extends ReactWidget {
   /**
    * The constructor of the widget.
@@ -39,7 +41,11 @@ export class SqlWidget extends ReactWidget {
     if (!model || model.type !== 'raw') {
       return;
     }
-    model.setMetadata('sql-cell', (event.target as HTMLInputElement).checked);
+    if ((event.target as HTMLInputElement).checked) {
+      model.setMetadata('format', METADATA_SQL_FORMAT);
+    } else if (model.getMetadata('format') === METADATA_SQL_FORMAT) {
+      model.deleteMetadata('format');
+    }
   }
 
   /**
@@ -83,16 +89,18 @@ export class SqlWidget extends ReactWidget {
                 disabled={this._tracker.activeCell?.model.type !== 'raw'}
                 aria-disabled={this._tracker.activeCell?.model.type !== 'raw'}
                 onChange={event => this._switch(event)}
-                checked={this._tracker.activeCell?.model.getMetadata(
-                  'sql-cell'
-                )}
+                checked={
+                  this._tracker.activeCell?.model.getMetadata('format') ===
+                  METADATA_SQL_FORMAT
+                }
               />
               <span className={'slider'}></span>
             </label>
             <ToolbarButtonComponent
               enabled={
                 this._tracker.activeCell?.model.type === 'raw' &&
-                this._tracker.activeCell?.model.getMetadata('sql-cell') === true
+                this._tracker.activeCell?.model.getMetadata('format') ===
+                  METADATA_SQL_FORMAT
               }
               icon={runIcon}
               onClick={this._run.bind(this)}
