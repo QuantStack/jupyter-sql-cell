@@ -10,7 +10,7 @@ import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { runIcon } from '@jupyterlab/ui-components';
 
 import { requestAPI } from './handler';
-import { SqlWidget } from './widget';
+import { METADATA_SQL_FORMAT, SqlWidget } from './widget';
 
 /**
  * Initialization data for the @jupyter/sql-cell extension.
@@ -66,7 +66,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
         if (!model) {
           return false;
         }
-        return model.type === 'raw' && model.getMetadata('sql-cell');
+        return (
+          model.type === 'raw' &&
+          model.getMetadata('format') === METADATA_SQL_FORMAT
+        );
       }
     });
 
