@@ -4,6 +4,7 @@ import {
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
 import { ICommandPalette, IToolbarWidgetRegistry } from '@jupyterlab/apputils';
+import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 import { Contents, ContentsManager } from '@jupyterlab/services';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
@@ -20,12 +21,13 @@ const plugin: JupyterFrontEndPlugin<void> = {
   description: 'A JupyterLab extension to run SQL in notebook dedicated cells',
   autoStart: true,
   requires: [INotebookTracker, IToolbarWidgetRegistry],
-  optional: [ICommandPalette, ISettingRegistry],
+  optional: [ICommandPalette, IDefaultFileBrowser, ISettingRegistry],
   activate: (
     app: JupyterFrontEnd,
     tracker: INotebookTracker,
     toolbarRegistry: IToolbarWidgetRegistry,
     commandPalette: ICommandPalette | null,
+    fileBrowser: IDefaultFileBrowser | null,
     settingRegistry: ISettingRegistry | null
   ) => {
     const { commands } = app;
@@ -51,7 +53,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
           body: JSON.stringify({ query: source })
         })
           .then(data => {
-            saveData(path, data.data, date)
+            saveData(path, data.data, date, fileBrowser)
               .then(dataPath => console.log(`Data saved ${dataPath}`))
               .catch(undefined);
           })
@@ -120,7 +122,8 @@ export default plugin;
 async function saveData(
   path: string,
   data: any,
-  date: Date
+  date: Date,
+  fileBrowser: IDefaultFileBrowser | null
 ): Promise<string | undefined> {
   const contentsManager = new ContentsManager();
   const parser = new Parser();
@@ -132,21 +135,25 @@ async function saveData(
     .replace(/\s/g, '')
     .replace(',', '_');
 
-  const filename = `${dateText}.csv`;
-  const fileModel = {
-    name: filename,
-    path: `${path}/${filename}`,
-    format: 'text' as Contents.FileFormat,
-    content: csv
-  };
-
   let currentPath = '';
+  if (!path.startsWith('/')) {
+    currentPath = `${fileBrowser?.model.path}/` || '';
+  }
+
   for (const directory of path.split('/')) {
     currentPath = `${currentPath}${directory}/`;
     await contentsManager
       .get(currentPath, { content: false })
       .catch(() => contentsManager.save(currentPath, { type: 'directory' }));
   }
+
+  const filename = `${dateText}.csv`;
+  const fileModel = {
+    name: filename,
+    path: `${currentPath}/${filename}`,
+    format: 'text' as Contents.FileFormat,
+    content: csv
+  };
 
   return contentsManager
     .save(fileModel.path, fileModel)

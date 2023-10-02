@@ -61,6 +61,7 @@
         "@jupyterlab/apputils": "^4.0.0",
         "@jupyterlab/cells": "^4.0.0",
         "@jupyterlab/coreutils": "^6.0.0",
+        "@jupyterlab/filebrowser": "^4.0.0",
         "@jupyterlab/notebook": "^4.0.0",
         "@jupyterlab/services": "^7.0.0",
         "@jupyterlab/settingregistry": "^4.0.0",
