@@ -2067,6 +2067,7 @@ __metadata:
     "@jupyterlab/builder": ^4.0.0
     "@jupyterlab/cells": ^4.0.0
     "@jupyterlab/coreutils": ^6.0.0
+    "@jupyterlab/filebrowser": ^4.0.0
     "@jupyterlab/notebook": ^4.0.0
     "@jupyterlab/services": ^7.0.0
     "@jupyterlab/settingregistry": ^4.0.0
@@ -2409,7 +2410,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyterlab/filebrowser@npm:^4.0.6":
+"@jupyterlab/filebrowser@npm:^4.0.0, @jupyterlab/filebrowser@npm:^4.0.6":
   version: 4.0.6
   resolution: "@jupyterlab/filebrowser@npm:4.0.6"
   dependencies:
