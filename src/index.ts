@@ -3,17 +3,11 @@ import {
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
-import {
-  ICommandPalette,
-  IToolbarWidgetRegistry,
-  createToolbarFactory
-} from '@jupyterlab/apputils';
-import { CellBarExtension } from '@jupyterlab/cell-toolbar';
+import { ICommandPalette, IToolbarWidgetRegistry } from '@jupyterlab/apputils';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 import { Contents, ContentsManager } from '@jupyterlab/services';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
-import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 import { runIcon } from '@jupyterlab/ui-components';
 
 import { requestAPI } from './handler';
@@ -21,10 +15,10 @@ import { CommandIDs, METADATA_SQL_FORMAT, SqlCell } from './common';
 import { SqlWidget } from './widget';
 
 /**
- * Load the commands.
+ * Load the commands and the cell toolbar buttons (from settings).
  */
-const commands: JupyterFrontEndPlugin<void> = {
-  id: '@jupyter/sql-cell:commands',
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: '@jupyter/sql-cell:plugin',
   description: 'Add the commands to the registry.',
   autoStart: true,
   requires: [INotebookTracker],
@@ -107,37 +101,6 @@ const commands: JupyterFrontEndPlugin<void> = {
 };
 
 /**
- * The cell toolbar buttons.
- */
-const cellToolbar: JupyterFrontEndPlugin<void> = {
-  id: '@jupyter/sql-cell:cell-toolbar',
-  description: 'Add the cells toolbar.',
-  autoStart: true,
-  optional: [ISettingRegistry, IToolbarWidgetRegistry, ITranslator],
-  activate: async (
-    app: JupyterFrontEnd,
-    settingRegistry: ISettingRegistry | null,
-    toolbarRegistry: IToolbarWidgetRegistry | null,
-    translator: ITranslator | null
-  ) => {
-    const toolbarItems =
-      settingRegistry && toolbarRegistry
-        ? createToolbarFactory(
-            toolbarRegistry,
-            settingRegistry,
-            CellBarExtension.FACTORY_NAME,
-            cellToolbar.id,
-            translator ?? nullTranslator
-          )
-        : undefined;
-    app.docRegistry.addWidgetExtension(
-      'Notebook',
-      new CellBarExtension(app.commands, toolbarItems)
-    );
-  }
-};
-
-/**
  * The notebook toolbar widget.
  */
 const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
@@ -180,7 +143,7 @@ const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
   }
 };
 
-export default [cellToolbar, commands, notebookToolbarWidget];
+export default [notebookToolbarWidget, plugin];
 
 namespace Private {
   /**

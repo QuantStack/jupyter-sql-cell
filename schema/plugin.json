@@ -1,0 +1,20 @@
+{
+  "jupyter.lab.toolbars": {
+    "Cell": [
+      {
+        "name": "SQL switch",
+        "command": "jupyter-sql-cell:switch"
+      },
+      {
+        "name": "SQL run",
+        "command": "jupyter-sql-cell:execute"
+      }
+    ]
+  },
+  "jupyter.lab.shortcuts": [],
+  "title": "@jupyter/sql-cell",
+  "description": "@jupyter/sql-cell settings.",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

@@ -121,10 +121,7 @@
         },
         "extension": true,
         "outputDir": "jupyter_sql_cell/labextension",
-        "schemaDir": "schema",
-        "disabledExtensions": [
-            "@jupyterlab/cell-toolbar-extension:plugin"
-        ]
+        "schemaDir": "schema"
     },
     "eslintIgnore": [
         "node_modules",
