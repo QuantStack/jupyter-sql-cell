@@ -49,7 +49,8 @@ test('cell-toolbar execute button should be enabled for sql cell only', async ({
 }) => {
   await page.goto();
   await page.notebook.createNew();
-  await page.notebook.addCell('raw', '');
+  await page.notebook.addCell('code', '');
+  await page.notebook.setCellType(1, 'raw');
 
   expect(
     page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]')
