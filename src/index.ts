@@ -23,7 +23,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
   autoStart: true,
   requires: [INotebookTracker],
   optional: [ICommandPalette, IDefaultFileBrowser],
-  activate: async (
+  activate: (
     app: JupyterFrontEnd,
     tracker: INotebookTracker,
     commandPalette: ICommandPalette,

@@ -1,65 +1,72 @@
-import { expect, test } from '@jupyterlab/galata';
+import { expect, galata, test } from '@jupyterlab/galata';
+import * as path from 'path';
 
-/**
- * Don't load JupyterLab webpage before running the tests.
- * This is required to ensure we capture all log messages.
- */
-test.use({ autoGoto: false });
+const fileName = 'simple.ipynb';
 
-test('cell-toolbar should contains buttons for raw cells only', async ({
-  page
-}) => {
-  await page.goto();
-  await page.notebook.createNew();
-  await page.notebook.addCell('code', '');
+test.describe('cell toolbar', () => {
+  test.beforeEach(async ({ page, request, tmpPath }) => {
+    const contents = galata.newContentsHelper(request);
+    await contents.uploadFile(
+      path.resolve(__dirname, `./notebooks/${fileName}`),
+      `${tmpPath}/${fileName}`
+    );
+    await page.notebook.openByPath(`${tmpPath}/${fileName}`);
+    await page.notebook.activate(fileName);
+  });
 
-  // The cell toolbar should not contain SQL buttons for code cells
-  await expect(page.locator('.jp-cell-toolbar')).toHaveCount(1);
+  test.afterEach(async ({ request, tmpPath }) => {
+    const contents = galata.newContentsHelper(request);
+    await contents.deleteDirectory(tmpPath);
+  });
 
-  expect(
-    page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:switch"]')
-  ).not.toBeVisible();
-  expect(
-    page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]')
-  ).not.toBeVisible();
+  test('cell-toolbar should contain sql buttons for raw cells only', async ({
+    page
+  }) => {
 
-  // The cell toolbar should not contain SQL buttons for markdown cells
-  await page.notebook.setCellType(1, 'markdown');
+    // SQL buttons shouldn't be visible in code cells.
+    await (await page.notebook.getCellInput(0))?.click();
+    expect(
+      page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:switch"]')
+    ).not.toBeVisible();
+    expect(
+      page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]')
+    ).not.toBeVisible();
 
-  expect(
-    page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:switch"]')
-  ).not.toBeVisible();
-  expect(
-    page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]')
-  ).not.toBeVisible();
+    // SQL buttons shouldn't be visible in markdown cells.
+    await (await page.notebook.getCellInput(1))?.click();
+    expect(
+      page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:switch"]')
+    ).not.toBeVisible();
+    expect(
+      page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]')
+    ).not.toBeVisible();
 
-  // The cell toolbar should not contain SQL buttons for raw cells
-  await page.notebook.setCellType(1, 'raw');
+    // SQL buttons should be visible in raw cells.
+    await (await page.notebook.getCellInput(2))?.click();
+    expect(
+      page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:switch"]')
+    ).toBeVisible();
+    expect(
+      page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]')
+    ).toBeVisible();
+  });
 
-  expect(
-    page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:switch"]')
-  ).toBeVisible();
-  expect(
-    page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]')
-  ).toBeVisible();
-});
+  test('cell-toolbar execute button should be enabled for sql cell only', async ({
+    page
+  }) => {
+    await (await page.notebook.getCellInput(2))?.click();
 
-test('cell-toolbar execute button should be enabled for sql cell only', async ({
-  page
-}) => {
-  await page.goto();
-  await page.notebook.createNew();
-  await page.notebook.addCell('code', '');
-  await page.notebook.setCellType(1, 'raw');
+    expect(
+      page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]')
+    ).toBeDisabled();
 
-  expect(
-    page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]')
-  ).toBeDisabled();
+    // Switching to sql cell should enable the run button.
+    await page
+      .locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:switch"]')
+      .click();
 
-  await page
-    .locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:switch"]')
-    .click();
-  await expect(
-    page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]')
-  ).toBeEnabled();
+    await expect(
+      page.locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]')
+    ).toBeEnabled();
+  });
 });
