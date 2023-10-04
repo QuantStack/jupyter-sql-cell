@@ -1,13 +1,9 @@
 {
   "jupyter.lab.toolbars": {
-    "Cell": [
+    "Notebook": [
       {
-        "name": "SQL switch",
-        "command": "jupyter-sql-cell:switch"
-      },
-      {
-        "name": "SQL run",
-        "command": "jupyter-sql-cell:execute"
+        "name": "SqlWidget",
+        "rank": 50
       }
     ]
   },
