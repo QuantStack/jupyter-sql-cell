@@ -74,3 +74,19 @@
 .sql-cell-widget .jp-ToolbarButtonComponent {
   height: 22px;
 }
+
+.jp-cell-toolbar .lm-mod-hidden {
+  display: none;
+}
+
+.jp-cell-toolbar .lm-mod-toggled {
+  background-color: var(--jp-inverse-layout-color3);
+}
+
+.jp-cell-toolbar .lm-mod-toggled:hover {
+  background-color: var(--jp-inverse-layout-color4);
+}
+
+.jp-cell-toolbar .lm-mod-toggled .jp-ToolbarButtonComponent-label {
+  color: var(--jp-ui-inverse-font-color2);
+}

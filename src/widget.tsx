@@ -10,7 +10,7 @@ import { CommandRegistry } from '@lumino/commands';
 import { Signal } from '@lumino/signaling';
 import * as React from 'react';
 
-export const METADATA_SQL_FORMAT = 'application/sql';
+import { CommandIDs, SqlCell } from './common';
 
 export class SqlWidget extends ReactWidget {
   /**
@@ -19,7 +19,6 @@ export class SqlWidget extends ReactWidget {
   constructor(options: Private.IOptions) {
     super();
     this._commands = options.commands;
-    this._commandID = options.commandID;
     this._tracker = options.tracker;
     this._activeCell = this._tracker.activeCell;
   }
@@ -28,24 +27,14 @@ export class SqlWidget extends ReactWidget {
    * Execute the command.
    */
   private _run() {
-    this._commands.execute(this._commandID);
+    this._commands.execute(CommandIDs.run);
   }
 
   /**
    * Switch the status of the cell, SQL cell or not.
-   *
-   * @param event - the mouse event that triggered the function.
    */
-  private _switch(event: React.ChangeEvent) {
-    const model = this._tracker.activeCell?.model;
-    if (!model || model.type !== 'raw') {
-      return;
-    }
-    if ((event.target as HTMLInputElement).checked) {
-      model.setMetadata('format', METADATA_SQL_FORMAT);
-    } else if (model.getMetadata('format') === METADATA_SQL_FORMAT) {
-      model.deleteMetadata('format');
-    }
+  private _switch() {
+    this._commands.execute(CommandIDs.switchSQL);
   }
 
   /**
@@ -79,29 +68,22 @@ export class SqlWidget extends ReactWidget {
         {() => (
           <div
             className={'sql-cell-widget'}
-            aria-disabled={this._tracker.activeCell?.model.type !== 'raw'}
+            aria-disabled={!SqlCell.isRaw(this._tracker.activeCell?.model)}
           >
             <span>SQL cell</span>
             <label className={'switch'}>
               <input
                 type={'checkbox'}
                 className={'sql-cell-check'}
-                disabled={this._tracker.activeCell?.model.type !== 'raw'}
-                aria-disabled={this._tracker.activeCell?.model.type !== 'raw'}
-                onChange={event => this._switch(event)}
-                checked={
-                  this._tracker.activeCell?.model.getMetadata('format') ===
-                  METADATA_SQL_FORMAT
-                }
+                disabled={!SqlCell.isRaw(this._tracker.activeCell?.model)}
+                aria-disabled={!SqlCell.isRaw(this._tracker.activeCell?.model)}
+                onChange={this._switch.bind(this)}
+                checked={SqlCell.isSqlCell(this._tracker.activeCell?.model)}
               />
               <span className={'slider'}></span>
             </label>
             <ToolbarButtonComponent
-              enabled={
-                this._tracker.activeCell?.model.type === 'raw' &&
-                this._tracker.activeCell?.model.getMetadata('format') ===
-                  METADATA_SQL_FORMAT
-              }
+              enabled={SqlCell.isSqlCell(this._tracker.activeCell?.model)}
               icon={runIcon}
               onClick={this._run.bind(this)}
             ></ToolbarButtonComponent>
@@ -120,7 +102,6 @@ export class SqlWidget extends ReactWidget {
   }
 
   private _commands: CommandRegistry;
-  private _commandID: string;
   private _tracker: INotebookTracker;
   private _activeCell: Cell<ICellModel> | null;
   private _signal = new Signal<this, void>(this);

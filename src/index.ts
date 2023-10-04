@@ -3,38 +3,41 @@ import {
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
-import { ICommandPalette, IToolbarWidgetRegistry } from '@jupyterlab/apputils';
+import {
+  ICommandPalette,
+  IToolbarWidgetRegistry,
+  createToolbarFactory
+} from '@jupyterlab/apputils';
+import { CellBarExtension } from '@jupyterlab/cell-toolbar';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 import { Contents, ContentsManager } from '@jupyterlab/services';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
+import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 import { runIcon } from '@jupyterlab/ui-components';
 
 import { requestAPI } from './handler';
-import { METADATA_SQL_FORMAT, SqlWidget } from './widget';
+import { CommandIDs, METADATA_SQL_FORMAT, SqlCell } from './common';
+import { SqlWidget } from './widget';
 
 /**
- * Initialization data for the @jupyter/sql-cell extension.
+ * Load the commands.
  */
-const plugin: JupyterFrontEndPlugin<void> = {
-  id: '@jupyter/sql-cell:plugin',
-  description: 'A JupyterLab extension to run SQL in notebook dedicated cells',
+const commands: JupyterFrontEndPlugin<void> = {
+  id: '@jupyter/sql-cell:commands',
+  description: 'Add the commands to the registry.',
   autoStart: true,
-  requires: [INotebookTracker, IToolbarWidgetRegistry],
-  optional: [ICommandPalette, IDefaultFileBrowser, ISettingRegistry],
-  activate: (
+  requires: [INotebookTracker],
+  optional: [ICommandPalette, IDefaultFileBrowser],
+  activate: async (
     app: JupyterFrontEnd,
     tracker: INotebookTracker,
-    toolbarRegistry: IToolbarWidgetRegistry,
-    commandPalette: ICommandPalette | null,
-    fileBrowser: IDefaultFileBrowser | null,
-    settingRegistry: ISettingRegistry | null
+    commandPalette: ICommandPalette,
+    fileBrowser: IDefaultFileBrowser | null
   ) => {
     const { commands } = app;
 
-    const commandID = 'jupyter-sql-cell:execute';
-
-    commands.addCommand(commandID, {
+    commands.addCommand(CommandIDs.run, {
       label: 'Run SQL',
       caption: 'Run SQL',
       icon: runIcon,
@@ -53,7 +56,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
           body: JSON.stringify({ query: source })
         })
           .then(data => {
-            saveData(path, data.data, date, fileBrowser)
+            Private.saveData(path, data.data, date, fileBrowser)
               .then(dataPath => console.log(`Data saved ${dataPath}`))
               .catch(undefined);
           })
@@ -63,20 +66,96 @@ const plugin: JupyterFrontEndPlugin<void> = {
             );
           });
       },
-      isEnabled: () => {
-        const model = tracker.activeCell?.model;
-        if (!model) {
-          return false;
-        }
-        return (
-          model.type === 'raw' &&
-          model.getMetadata('format') === METADATA_SQL_FORMAT
-        );
-      }
+      isEnabled: () => SqlCell.isSqlCell(tracker.activeCell?.model),
+      isVisible: () => SqlCell.isRaw(tracker.activeCell?.model)
     });
 
+    commands.addCommand(CommandIDs.switchSQL, {
+      label: 'SQL',
+      caption: () => {
+        const model = tracker.activeCell?.model;
+        return SqlCell.isRaw(model)
+          ? SqlCell.isSqlCell(model)
+            ? 'Switch to Raw'
+            : 'Switch to SQL'
+          : 'Not available';
+      },
+      execute: async () => {
+        const model = tracker.activeCell?.model;
+        if (!model || model.type !== 'raw') {
+          return;
+        }
+        if (model.getMetadata('format') !== METADATA_SQL_FORMAT) {
+          model.setMetadata('format', METADATA_SQL_FORMAT);
+        } else if (model.getMetadata('format') === METADATA_SQL_FORMAT) {
+          model.deleteMetadata('format');
+        }
+        app.commands.notifyCommandChanged(CommandIDs.switchSQL);
+        app.commands.notifyCommandChanged(CommandIDs.run);
+      },
+      isVisible: () => SqlCell.isRaw(tracker.activeCell?.model),
+      isToggled: () => SqlCell.isSqlCell(tracker.activeCell?.model)
+    });
+
+    if (commandPalette) {
+      commandPalette.addItem({
+        command: CommandIDs.run,
+        category: 'SQL'
+      });
+    }
+  }
+};
+
+/**
+ * The cell toolbar buttons.
+ */
+const cellToolbar: JupyterFrontEndPlugin<void> = {
+  id: '@jupyter/sql-cell:cell-toolbar',
+  description: 'Add the cells toolbar.',
+  autoStart: true,
+  optional: [ISettingRegistry, IToolbarWidgetRegistry, ITranslator],
+  activate: async (
+    app: JupyterFrontEnd,
+    settingRegistry: ISettingRegistry | null,
+    toolbarRegistry: IToolbarWidgetRegistry | null,
+    translator: ITranslator | null
+  ) => {
+    const toolbarItems =
+      settingRegistry && toolbarRegistry
+        ? createToolbarFactory(
+            toolbarRegistry,
+            settingRegistry,
+            CellBarExtension.FACTORY_NAME,
+            cellToolbar.id,
+            translator ?? nullTranslator
+          )
+        : undefined;
+    app.docRegistry.addWidgetExtension(
+      'Notebook',
+      new CellBarExtension(app.commands, toolbarItems)
+    );
+  }
+};
+
+/**
+ * The notebook toolbar widget.
+ */
+const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
+  id: '@jupyter/sql-cell:notebook-toolbar',
+  description: 'A JupyterLab extension to run SQL in notebook dedicated cells',
+  autoStart: true,
+  requires: [INotebookTracker, IToolbarWidgetRegistry],
+  optional: [ISettingRegistry],
+  activate: (
+    app: JupyterFrontEnd,
+    tracker: INotebookTracker,
+    toolbarRegistry: IToolbarWidgetRegistry,
+    settingRegistry: ISettingRegistry | null
+  ) => {
+    const { commands } = app;
+
     const toolbarFactory = (panel: NotebookPanel) => {
-      return new SqlWidget({ commands, commandID, tracker });
+      return new SqlWidget({ commands, commandID: CommandIDs.run, tracker });
     };
 
     toolbarRegistry.addFactory<NotebookPanel>(
@@ -87,7 +166,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
     if (settingRegistry) {
       settingRegistry
-        .load(plugin.id)
+        .load(notebookToolbarWidget.id)
         .then(settings => {
           console.log('@jupyter/sql-cell settings loaded:', settings.composite);
         })
@@ -98,70 +177,65 @@ const plugin: JupyterFrontEndPlugin<void> = {
           );
         });
     }
-
-    if (commandPalette) {
-      commandPalette.addItem({
-        command: commandID,
-        category: 'SQL'
-      });
-    }
-
-    console.log('JupyterLab extension @jupyter/sql-cell is activated!');
   }
 };
 
-export default plugin;
+export default [cellToolbar, commands, notebookToolbarWidget];
 
-/**
- * Save data in a CSV file.
- *
- * @param path - the path to the directory where to save data.
- * @param data - the data to parse as CSV.
- * @param date - the query date.
- */
-async function saveData(
-  path: string,
-  data: any,
-  date: Date,
-  fileBrowser: IDefaultFileBrowser | null
-): Promise<string | undefined> {
-  const contentsManager = new ContentsManager();
-  const parser = new Parser();
-  const csv = parser.parse(data);
+namespace Private {
+  /**
+   * Save data in a CSV file.
+   *
+   * @param path - the path to the directory where to save data.
+   * @param data - the data to parse as CSV.
+   * @param date - the query date.
+   */
+  export async function saveData(
+    path: string,
+    data: any,
+    date: Date,
+    fileBrowser: IDefaultFileBrowser | null
+  ): Promise<string | undefined> {
+    const contentsManager = new ContentsManager();
+    const parser = new Parser();
+    const csv = parser.parse(data);
 
-  const dateText = date
-    .toLocaleString()
-    .replace(/[/:]/g, '-')
-    .replace(/\s/g, '')
-    .replace(',', '_');
+    const dateText = date
+      .toLocaleString()
+      .replace(/[/:]/g, '-')
+      .replace(/\s/g, '')
+      .replace(',', '_');
 
-  let currentPath = '';
-  if (!path.startsWith('/')) {
-    currentPath = `${fileBrowser?.model.path}/` || '';
+    let currentPath = '';
+    if (!path.startsWith('/')) {
+      currentPath = `${fileBrowser?.model.path}/` || '';
+    }
+
+    for (const directory of path.split('/')) {
+      currentPath = `${currentPath}${directory}/`;
+      await contentsManager
+        .get(currentPath, { content: false })
+        .catch(error =>
+          contentsManager.save(currentPath, { type: 'directory' })
+        );
+    }
+
+    const filename = `${dateText}.csv`;
+    const fileModel = {
+      name: filename,
+      path: `${currentPath}/${filename}`,
+      format: 'text' as Contents.FileFormat,
+      content: csv
+    };
+
+    return contentsManager
+      .save(fileModel.path, fileModel)
+      .then(() => {
+        return fileModel.path;
+      })
+      .catch(e => {
+        console.error(e);
+        return undefined;
+      });
   }
-
-  for (const directory of path.split('/')) {
-    currentPath = `${currentPath}${directory}/`;
-    await contentsManager
-      .get(currentPath, { content: false })
-      .catch(() => contentsManager.save(currentPath, { type: 'directory' }));
-  }
-
-  const filename = `${dateText}.csv`;
-  const fileModel = {
-    name: filename,
-    path: `${currentPath}/${filename}`,
-    format: 'text' as Contents.FileFormat,
-    content: csv
-  };
-
-  return contentsManager
-    .save(fileModel.path, fileModel)
-    .then(() => {
-      return fileModel.path;
-    })
-    .catch(e => {
-      console.error(e);
-      return undefined;
-    });
 }
