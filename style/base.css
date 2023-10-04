@@ -87,6 +87,7 @@
   background-color: var(--jp-inverse-layout-color4);
 }
 
+/* stylelint-disable-next-line selector-class-pattern */
 .jp-cell-toolbar .lm-mod-toggled .jp-ToolbarButtonComponent-label {
   color: var(--jp-ui-inverse-font-color2);
 }
