@@ -22,7 +22,6 @@ test.describe('cell toolbar', () => {
   test('cell-toolbar should contain sql buttons for raw cells only', async ({
     page
   }) => {
-
     // SQL buttons shouldn't be visible in code cells.
     await (await page.notebook.getCellInput(0))?.click();
     expect(
