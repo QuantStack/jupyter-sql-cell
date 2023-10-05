@@ -8,7 +8,7 @@ import { IMapChange } from '@jupyter/ydoc';
 /**
  * The class of the custom raw cell.
  */
-const SQL_CELL_CLASS = 'jp-RawSqlCell';
+const SQL_CELL_CLASS = 'jp-SqlCell';
 
 /**
  * The cell content factory.
@@ -41,7 +41,6 @@ export class RawSqlCell extends RawCell {
    */
   constructor(options: RawCell.IOptions) {
     super(options);
-    this.addClass(SQL_CELL_CLASS);
     if (this.model.getMetadata('format') === SQL_MIMETYPE) {
       this._sqlCell();
     }
@@ -68,6 +67,7 @@ export class RawSqlCell extends RawCell {
    * Switch to raw cell type.
    */
   private _rawCell() {
+    this.removeClass(SQL_CELL_CLASS);
     const trans = this.translator.load('jupyterlab');
     this.node.setAttribute('aria-label', trans.__('Raw Cell Content'));
     this.model.mimeType = IEditorMimeTypeService.defaultMimeType;
@@ -77,6 +77,7 @@ export class RawSqlCell extends RawCell {
    * Switch to SQL cell type, using codemirror SQL mimetype.
    */
   private _sqlCell() {
+    this.addClass(SQL_CELL_CLASS);
     const trans = this.translator.load('jupyterlab');
     this.node.setAttribute('aria-label', trans.__('SQL Cell Content'));
     this.model.mimeType = SQL_MIMETYPE;
