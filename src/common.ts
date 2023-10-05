@@ -5,7 +5,7 @@ export namespace CommandIDs {
   export const run = 'jupyter-sql-cell:execute';
 }
 
-export const METADATA_SQL_FORMAT = 'application/sql';
+export const SQL_MIMETYPE = 'text/x-sql';
 
 export namespace SqlCell {
   export function isRaw(model: ICellModel | undefined) {
@@ -18,9 +18,6 @@ export namespace SqlCell {
     if (!model) {
       return false;
     }
-    return (
-      model.type === 'raw' &&
-      model.getMetadata('format') === METADATA_SQL_FORMAT
-    );
+    return model.type === 'raw' && model.getMetadata('format') === SQL_MIMETYPE;
   }
 }

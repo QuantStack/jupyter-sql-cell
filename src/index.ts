@@ -4,14 +4,16 @@ import {
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
 import { ICommandPalette, IToolbarWidgetRegistry } from '@jupyterlab/apputils';
+import { IEditorServices } from '@jupyterlab/codeeditor';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 import { Contents, ContentsManager } from '@jupyterlab/services';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { runIcon } from '@jupyterlab/ui-components';
 
+import { CustomContentFactory } from './cellfactory';
 import { requestAPI } from './handler';
-import { CommandIDs, METADATA_SQL_FORMAT, SqlCell } from './common';
+import { CommandIDs, SQL_MIMETYPE, SqlCell } from './common';
 import { SqlWidget } from './widget';
 
 /**
@@ -79,11 +81,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
         if (!model || model.type !== 'raw') {
           return;
         }
-        if (model.getMetadata('format') !== METADATA_SQL_FORMAT) {
-          model.setMetadata('format', METADATA_SQL_FORMAT);
-        } else if (model.getMetadata('format') === METADATA_SQL_FORMAT) {
+        if (model.getMetadata('format') !== SQL_MIMETYPE) {
+          model.setMetadata('format', SQL_MIMETYPE);
+        } else if (model.getMetadata('format') === SQL_MIMETYPE) {
           model.deleteMetadata('format');
         }
+
         app.commands.notifyCommandChanged(CommandIDs.switchSQL);
         app.commands.notifyCommandChanged(CommandIDs.run);
       },
@@ -97,6 +100,21 @@ const plugin: JupyterFrontEndPlugin<void> = {
         category: 'SQL'
       });
     }
+  }
+};
+
+/**
+ * The notebook cell factory provider, to handle SQL cells.
+ */
+const cellFactory: JupyterFrontEndPlugin<NotebookPanel.IContentFactory> = {
+  id: '@jupyter/sql-cell:content-factory',
+  description: 'Provides the notebook cell factory.',
+  provides: NotebookPanel.IContentFactory,
+  requires: [IEditorServices],
+  autoStart: true,
+  activate: (app: JupyterFrontEnd, editorServices: IEditorServices) => {
+    const editorFactory = editorServices.factoryService.newInlineEditor;
+    return new CustomContentFactory({ editorFactory });
   }
 };
 
@@ -143,7 +161,7 @@ const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
   }
 };
 
-export default [notebookToolbarWidget, plugin];
+export default [cellFactory, notebookToolbarWidget, plugin];
 
 namespace Private {
   /**
