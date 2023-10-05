@@ -44,9 +44,6 @@ export class RawSqlCell extends RawCell {
     if (this.model.getMetadata('format') === SQL_MIMETYPE) {
       this._sqlCell();
     }
-    if (this.editor) {
-      this.editor.model.mimeType = SQL_MIMETYPE;
-    }
   }
 
   /**
