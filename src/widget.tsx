@@ -27,7 +27,7 @@ export class SqlWidget extends ReactWidget {
    * Execute the command.
    */
   private _run() {
-    this._commands.execute(CommandIDs.run);
+    this._commands.execute(CommandIDs.execute);
   }
 
   /**

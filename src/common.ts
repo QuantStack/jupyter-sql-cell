@@ -11,7 +11,7 @@ export namespace CommandIDs {
   /**
    * Execute the query on the server.
    */
-  export const run = 'jupyter-sql-cell:execute';
+  export const execute = 'jupyter-sql-cell:execute';
 }
 
 /**
