@@ -61,6 +61,7 @@
         "@jupyterlab/apputils": "^4.0.0",
         "@jupyterlab/cell-toolbar": "^4.0.0",
         "@jupyterlab/cells": "^4.0.0",
+        "@jupyterlab/codeeditor": "^4.0.0",
         "@jupyterlab/coreutils": "^6.0.0",
         "@jupyterlab/filebrowser": "^4.0.0",
         "@jupyterlab/notebook": "^4.0.0",
@@ -121,7 +122,10 @@
         },
         "extension": true,
         "outputDir": "jupyter_sql_cell/labextension",
-        "schemaDir": "schema"
+        "schemaDir": "schema",
+        "disabledExtensions": [
+            "@jupyterlab/notebook-extension:factory"
+        ]
     },
     "eslintIgnore": [
         "node_modules",
