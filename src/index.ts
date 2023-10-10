@@ -49,7 +49,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         const source = activeCell?.model.sharedModel.getSource();
         requestAPI<any>('execute', {
           method: 'POST',
-          body: JSON.stringify({ query: source })
+          body: JSON.stringify({ query: source, id: 0 })
         })
           .then(data => {
             Private.saveData(path, data.data, date, fileBrowser)
@@ -57,9 +57,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
               .catch(undefined);
           })
           .catch(reason => {
-            console.error(
-              `The jupyter_sql_cell server extension appears to be missing.\n${reason}`
-            );
+            console.error(reason);
           });
       },
       isEnabled: () => SqlCell.isSqlCell(tracker.activeCell?.model),

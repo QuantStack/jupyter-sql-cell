@@ -6,6 +6,13 @@ import tornado
 from .sqlconnector import SQLConnector
 
 
+def reply_error(api: APIHandler, msg: StopIteration):
+    api.set_status(500)
+    api.log.error(msg)
+    reply = {"message": msg}
+    api.finish(json.dumps(reply))
+
+
 class ExecuteHandler(APIHandler):
     # The following decorator should be present on all verb methods (head, get, post,
     # patch, put, delete, options) to ensure only authorized user can request the
@@ -13,17 +20,26 @@ class ExecuteHandler(APIHandler):
     @tornado.gen.coroutine
     @tornado.web.authenticated
     def post(self):
-        query = json.loads(self.request.body).get("query", None)
+        body = json.loads(self.request.body)
+        id = body.get("id", "0")
+        query = body.get("query", None)
 
         try:
-            connector = SQLConnector()
+            connector = SQLConnector(int(id))
+            if connector.errors:
+                reply_error(self, connector.errors[0])
+                return
         except Exception as e:
             self.log.error(f"Connector error\n{e}")
             self.write_error(500, exec_info=e)
+            return
 
         try:
             result = yield connector.execute(query)
             self.finish(json.dumps({
+                "id": id,
+                "url": connector.database["url"],
+                "query": query,
                 "data": result
             }))
         except Exception as e:
