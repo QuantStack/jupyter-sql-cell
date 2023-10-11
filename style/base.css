@@ -91,3 +91,15 @@
 .jp-cell-toolbar .lm-mod-toggled .jp-ToolbarButtonComponent-label {
   color: var(--jp-ui-inverse-font-color2);
 }
+
+
+/* SIDE PANEL */
+
+.jp-SqlCell-database-body td {
+  padding: 2px;
+  font-size: var(--jp-ui-font-size1);
+}
+
+.jp-SqlCell-database-body td:first-child {
+  font-weight: bold;
+}

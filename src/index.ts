@@ -9,11 +9,13 @@ import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 import { Contents, ContentsManager } from '@jupyterlab/services';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
+import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 import { runIcon } from '@jupyterlab/ui-components';
 
 import { CustomContentFactory } from './cellfactory';
 import { requestAPI } from './handler';
 import { CommandIDs, SQL_MIMETYPE, SqlCell } from './common';
+import { Databases } from './sidepanel';
 import { SqlWidget } from './widget';
 
 /**
@@ -117,6 +119,25 @@ const cellFactory: JupyterFrontEndPlugin<NotebookPanel.IContentFactory> = {
 };
 
 /**
+ * The side panel to handle the list of databases.
+ */
+const databasesList: JupyterFrontEndPlugin<void> = {
+  id: '@jupyter/sql-cell:databases-list',
+  description: 'The side panel which handle databases list.',
+  autoStart: true,
+  optional: [ITranslator],
+  activate: (app: JupyterFrontEnd, translator: ITranslator | null) => {
+    const { shell } = app;
+    if (!translator) {
+      translator = nullTranslator;
+    }
+    const panel = new Databases({ translator: translator });
+
+    shell.add(panel, 'left');
+  }
+};
+
+/**
  * The notebook toolbar widget.
  */
 const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
@@ -159,7 +180,7 @@ const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
   }
 };
 
-export default [cellFactory, notebookToolbarWidget, plugin];
+export default [cellFactory, databasesList, notebookToolbarWidget, plugin];
 
 namespace Private {
   /**

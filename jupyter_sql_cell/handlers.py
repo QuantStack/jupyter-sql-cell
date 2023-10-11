@@ -13,6 +13,19 @@ def reply_error(api: APIHandler, msg: StopIteration):
     api.finish(json.dumps(reply))
 
 
+class DatabasesHandler(APIHandler):
+    @tornado.web.authenticated
+    def get(self):
+        try:
+            databases = SQLConnector.databases
+            for db in databases:
+                db["url"] = str(db["url"])
+            self.finish(json.dumps(databases))
+        except Exception as e:
+            self.log.error(f"Databases error\n{e}")
+            self.write_error(500, exec_info=e)
+
+
 class ExecuteHandler(APIHandler):
     # The following decorator should be present on all verb methods (head, get, post,
     # patch, put, delete, options) to ensure only authorized user can request the
@@ -37,10 +50,10 @@ class ExecuteHandler(APIHandler):
         try:
             result = yield connector.execute(query)
             self.finish(json.dumps({
+                "data": result,
                 "id": id,
-                "url": connector.database["url"],
                 "query": query,
-                "data": result
+                "url": connector.database["url"]
             }))
         except Exception as e:
             self.log.error(f"Query error\n{e}")

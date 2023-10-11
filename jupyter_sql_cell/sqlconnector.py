@@ -12,6 +12,7 @@ ASYNC_DRIVERS = {
 
 
 class DatabaseDesc(TypedDict):
+    alias: Optional[str]
     database: str
     dbms: str
     driver: Optional[str]
@@ -20,14 +21,20 @@ class DatabaseDesc(TypedDict):
 
 
 class Database(TypedDict):
-    url: str
+    alias: str
+    id: int
+    is_async: bool
+    url: URL
+
+
+class DatabaseSummary(DatabaseDesc):
     id: int
     is_async: bool
 
 
 class SQLConnector:
 
-    databases: [Dict] = []
+    databases: [Database] = []
     warnings = []
 
     def __init__(self, database_id: int):
@@ -58,9 +65,14 @@ class SQLConnector:
     @classmethod
     def add_database(cls, db_desc: DatabaseDesc):
         id = 0
-
         if cls.databases:
             id = max([db["id"] for db in cls.databases]) + 1
+
+        if db_desc["alias"]:
+            alias = db_desc["alias"]
+        else:
+            alias = f"{db_desc['dbms']}_{id}"
+
         if db_desc["driver"]:
             drivers = [db_desc["driver"]]
         else:
@@ -76,6 +88,7 @@ class SQLConnector:
             try:
                 create_async_engine(url)
                 cls.databases.append({
+                    "alias": alias,
                     "id": id,
                     "url": url,
                     "is_async": True
@@ -95,12 +108,34 @@ class SQLConnector:
         )
         create_engine(url)
         cls.databases.append({
+            "alias": alias,
             "id": id,
             "url": url,
             "is_async": False
         })
         cls.warnings.append("No async driver found, the query will be executed synchronously")
         print(cls.warnings[-1])
+
+    @classmethod
+    def get_databases(cls):
+        summary_databases: [DatabaseSummary] = []
+        for database in cls.databases:
+            url: URL = database["url"]
+            summary: DatabaseSummary = {
+                "alias": database["alias"],
+                "database": url.database,
+                "driver": url.drivername,
+                "host": url.host,
+                "port": url.port,
+                "id": database["id"],
+                "is_async": database["is_async"]
+            }
+            if url.host:
+                summary["host"] = url.host
+            if url.port:
+                summary["port"] = url.port
+            summary_databases.push(summary)
+        return summary_databases
 
     @staticmethod
     def to_list(cursor: CursorResult[Any]) -> List[Dict]:
