@@ -92,14 +92,32 @@
   color: var(--jp-ui-inverse-font-color2);
 }
 
-
 /* SIDE PANEL */
 
-.jp-SqlCell-database-body td {
-  padding: 2px;
-  font-size: var(--jp-ui-font-size1);
+.jp-SqlCell-database-body .lm-mod-hidden {
+  display: none;
 }
 
-.jp-SqlCell-database-body td:first-child {
-  font-weight: bold;
+ul.jp-SqlCell-table-items {
+  display: block;
+  margin: 0;
+  padding-inline-start: 1em;
+  list-style-type: none;
+}
+
+.jp-SqlCell-table-title {
+  cursor: pointer;
+}
+
+.jp-SqlCell-table-title:hover {
+  background-color: var(--jp-layout-color2);
+}
+
+.jp-SqlCell-table-title > span {
+  vertical-align: middle;
+}
+
+ul.jp-SqlCell-column-items {
+  padding-inline-start: 2em;
+  list-style-type: disc;
 }

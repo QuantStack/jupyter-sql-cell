@@ -4,7 +4,7 @@ from jupyter_server.extension.application import ExtensionApp
 from jupyter_server.utils import url_path_join
 from traitlets import Dict, Integer, List, Unicode
 
-from .handlers import DatabasesHandler, ExampleHandler, ExecuteHandler
+from .handlers import DatabasesHandler, DatabaseSchemaHandler, ExampleHandler, ExecuteHandler
 from .sqlconnector import SQLConnector
 
 
@@ -70,8 +70,10 @@ class JupyterSqlCell(ExtensionApp):
         example_pattern = url_path_join(self.default_url, "get-example")
         databases_pattern = url_path_join(self.default_url, "databases")
         execute_pattern = url_path_join(self.default_url, "execute")
+        schema_pattern = url_path_join(self.default_url, "schema")
         self.handlers.extend([
             (databases_pattern, DatabasesHandler),
             (example_pattern, ExampleHandler),
-            (execute_pattern, ExecuteHandler)
+            (execute_pattern, ExecuteHandler),
+            (schema_pattern, DatabaseSchemaHandler)
         ])

@@ -1,6 +1,6 @@
 from sqlalchemy.exc import InvalidRequestError, NoSuchModuleError
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy import CursorResult, URL, create_engine, text
+from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
+from sqlalchemy import CursorResult, Inspector, URL, create_engine, inspect, text
 from typing import Any, Dict, List, Optional, TypedDict
 
 ASYNC_DRIVERS = {
@@ -40,7 +40,7 @@ class SQLConnector:
     def __init__(self, database_id: int):
         self.engine = None
         self.errors = []
-        self.database = next(filter(lambda db: db["id"] == database_id, self.databases), None)
+        self.database: Database = next(filter(lambda db: db["id"] == database_id, self.databases), None)
 
         if not self.database:
             self.errors.append(f"There is no registered database with id {database_id}")
@@ -49,6 +49,20 @@ class SQLConnector:
                 self.engine = create_async_engine(self.database["url"])
             else:
                 self.engine = create_engine(self.database["url"])
+
+    async def get_schema(self, target: str, table: str) -> [str]:
+        if self.database["is_async"]:
+            async with self.engine.connect() as conn:
+                schema = await conn.run_sync(self.use_inspector, target, table)
+        return schema
+
+    def use_inspector(self, conn: AsyncConnection, target: str, table: str) -> [str]:
+        inspector: Inspector = inspect(conn)
+        if target == "tables":
+            return inspector.get_table_names()
+        elif target == "columns":
+            columns = inspector.get_columns(table)
+            return sorted([column['name'] for column in columns])
 
     async def execute(self, query: str) -> str:
         if not self.engine:
@@ -125,8 +139,6 @@ class SQLConnector:
                 "alias": database["alias"],
                 "database": url.database,
                 "driver": url.drivername,
-                "host": url.host,
-                "port": url.port,
                 "id": database["id"],
                 "is_async": database["is_async"]
             }
@@ -134,7 +146,7 @@ class SQLConnector:
                 summary["host"] = url.host
             if url.port:
                 summary["port"] = url.port
-            summary_databases.push(summary)
+            summary_databases.append(summary)
         return summary_databases
 
     @staticmethod
