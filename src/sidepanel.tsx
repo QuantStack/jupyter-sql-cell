@@ -29,35 +29,35 @@ export const DATABASE_METADATA = 'sqlcell-database';
 /**
  * The class of the side panel.
  */
-const DATABASES_CLASS = 'jp-SqlCell-DatabasesPanel';
+const DATABASES_CLASS = 'jp-sqlcell-databases-panel';
 /**
  * The class of the side panel.
  */
-const DATABASE_CLASS = 'jp-SqlCell-database';
+const DATABASE_CLASS = 'jp-sqlcell-database';
 /**
  * The class of the database toolbar.
  */
-const TOOLBAR_CLASS = 'jp-SqlCell-database-toolbar';
+const TOOLBAR_CLASS = 'jp-sqlcell-database-toolbar';
 /**
  * The class of the button in database toolbar.
  */
-const SELECT_BUTTON_CLASS = 'jp-SqlCell-database-selectButton';
+const SELECT_BUTTON_CLASS = 'jp-sqlcell-database-selectbutton';
 /**
  * The class of the body of the database.
  */
-const DATABASE_BODY_CLASS = 'jp-SqlCell-database-body';
+const DATABASE_BODY_CLASS = 'jp-sqlcell-database-body';
 /**
  * The class of tables list.
  */
-const TABLE_ITEMS_CLASS = 'jp-SqlCell-table-items';
+const TABLE_ITEMS_CLASS = 'jp-sqlcell-table-items';
 /**
  * The class of table name.
  */
-const TABLE_TITLE_CLASS = 'jp-SqlCell-table-title';
+const TABLE_TITLE_CLASS = 'jp-sqlcell-table-title';
 /**
  * The class of the column item.
  */
-const COLUMN_ITEMS_CLASS = 'jp-SqlCell-column-items';
+const COLUMN_ITEMS_CLASS = 'jp-sqlcell-column-items';
 
 /**
  * The database icon.

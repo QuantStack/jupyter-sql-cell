@@ -94,42 +94,42 @@
 
 /* SIDE PANEL */
 
-.jp-SqlCell-database-body .lm-mod-hidden {
+.jp-sqlcell-database-body .lm-mod-hidden {
   display: none;
 }
 
-.jp-SqlCell-database-selectButton[aria-pressed='true'] {
+.jp-sqlcell-database-selectbutton[aria-pressed='true'] {
   background-color: var(--jp-inverse-layout-color3);
 }
 
-.jp-SqlCell-database-selectButton[aria-pressed='true']:hover {
+.jp-sqlcell-database-selectbutton[aria-pressed='true']:hover {
   background-color: var(--jp-inverse-layout-color4);
 }
 
-.jp-SqlCell-database-selectButton[aria-pressed='true'] span {
+.jp-sqlcell-database-selectbutton[aria-pressed='true'] span {
   color: var(--jp-ui-inverse-font-color1);
 }
 
-ul.jp-SqlCell-table-items {
+ul.jp-sqlcell-table-items {
   display: block;
   margin: 0;
   padding-inline-start: 1em;
   list-style-type: none;
 }
 
-.jp-SqlCell-table-title {
+.jp-sqlcell-table-title {
   cursor: pointer;
 }
 
-.jp-SqlCell-table-title:hover {
+.jp-sqlcell-table-title:hover {
   background-color: var(--jp-layout-color2);
 }
 
-.jp-SqlCell-table-title > span {
+.jp-sqlcell-table-title > span {
   vertical-align: middle;
 }
 
-ul.jp-SqlCell-column-items {
+ul.jp-sqlcell-column-items {
   padding-inline-start: 2em;
   list-style-type: disc;
 }
