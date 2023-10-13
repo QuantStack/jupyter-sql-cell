@@ -1,5 +1,6 @@
 import { ITranslator } from '@jupyterlab/translation';
 import {
+  LabIcon,
   PanelWithToolbar,
   ReactWidget,
   SidePanel,
@@ -7,14 +8,14 @@ import {
   UseSignal,
   caretDownIcon,
   caretRightIcon,
-  deleteIcon,
-  tableRowsIcon
+  deleteIcon
 } from '@jupyterlab/ui-components';
 import { Signal } from '@lumino/signaling';
 import { AccordionPanel, Panel } from '@lumino/widgets';
 import * as React from 'react';
 
 import { requestAPI } from './handler';
+import databaseSvgstr from '../style/icons/database.svg';
 
 /**
  * The class of the side panel.
@@ -50,17 +51,25 @@ const TABLE_TITLE_CLASS = 'jp-SqlCell-table-title';
 const COLUMN_ITEMS_CLASS = 'jp-SqlCell-column-items';
 
 /**
+ * The database icon.
+ */
+const databaseIcon = new LabIcon({
+  name: 'sql-cell:database',
+  svgstr: databaseSvgstr
+});
+
+/**
  * The side panel containing the list of the databases.
  */
 export class Databases extends SidePanel {
   /**
    * Constructor of the databases list.
    */
-  constructor(options: Database.IOptions) {
+  constructor(options: Databases.IOptions) {
     super({ translator: options.translator });
     this.id = 'jp-sql-cell-sidebar';
     this.addClass(DATABASES_CLASS);
-    this.title.icon = tableRowsIcon;
+    this.title.icon = databaseIcon;
     this.title.caption = 'Databases';
 
     requestAPI<any>('databases')
@@ -75,7 +84,7 @@ export class Databases extends SidePanel {
     content.expansionToggled.connect(this._onExpansionToogled, this);
   }
 
-  private _buildDatabaseSections(databases: Database.IDatabase[]) {
+  private _buildDatabaseSections(databases: Databases.IDatabase[]) {
     const content = this.content as AccordionPanel;
     databases.forEach(database => {
       this.addWidget(new DatabaseSection({ database }));
@@ -94,7 +103,7 @@ export class Databases extends SidePanel {
 /**
  * Namespace for the databases side panel.
  */
-namespace Database {
+namespace Databases {
   /**
    * Options of the databases side panel's constructor.
    */
@@ -162,7 +171,7 @@ class DatabaseSection extends PanelWithToolbar {
 
   private _tooltip() {
     let tooltip = '';
-    let key: keyof Database.IDatabase;
+    let key: keyof Databases.IDatabase;
     for (key in this._database) {
       tooltip = tooltip + `${key}: ${this._database[key]?.toString()}\n`;
     }
@@ -173,7 +182,7 @@ class DatabaseSection extends PanelWithToolbar {
     this._body.updateTables(this._tables);
   }
 
-  private _database: Database.IDatabase;
+  private _database: Databases.IDatabase;
   private _body: TablesList;
   private _tables: string[] = [];
 }
@@ -186,7 +195,7 @@ namespace DatabaseSection {
    * Options for the DatabaseSection constructor.
    */
   export interface IOptions extends Panel.IOptions {
-    database: Database.IDatabase;
+    database: Databases.IDatabase;
   }
 
   /**
