@@ -1,3 +1,5 @@
+import { Cell, ICellModel } from '@jupyterlab/cells';
+import { INotebookTracker } from '@jupyterlab/notebook';
 import { ITranslator } from '@jupyterlab/translation';
 import {
   LabIcon,
@@ -8,14 +10,21 @@ import {
   UseSignal,
   caretDownIcon,
   caretRightIcon,
-  deleteIcon
+  deleteIcon,
+  tableRowsIcon
 } from '@jupyterlab/ui-components';
 import { Signal } from '@lumino/signaling';
-import { AccordionPanel, Panel } from '@lumino/widgets';
+import { AccordionPanel, Panel, Widget } from '@lumino/widgets';
 import * as React from 'react';
 
+import { SqlCell } from './common';
 import { requestAPI } from './handler';
 import databaseSvgstr from '../style/icons/database.svg';
+
+/**
+ * The metadata key to store the database.
+ */
+export const DATABASE_METADATA = 'sqlcell-database';
 
 /**
  * The class of the side panel.
@@ -28,11 +37,11 @@ const DATABASE_CLASS = 'jp-SqlCell-database';
 /**
  * The class of the database toolbar.
  */
-const DATABASE_TOOLBAR_CLASS = 'jp-SqlCell-database-toolbar';
+const TOOLBAR_CLASS = 'jp-SqlCell-database-toolbar';
 /**
  * The class of the button in database toolbar.
  */
-const DATABASE_TOOLBAR_BUTTON_CLASS = 'jp-SqlCell-database-toolbarButton';
+const SELECT_BUTTON_CLASS = 'jp-SqlCell-database-selectButton';
 /**
  * The class of the body of the database.
  */
@@ -71,10 +80,11 @@ export class Databases extends SidePanel {
     this.addClass(DATABASES_CLASS);
     this.title.icon = databaseIcon;
     this.title.caption = 'Databases';
+    this._tracker = options.tracker;
 
     requestAPI<any>('databases')
       .then(data => {
-        this._buildDatabaseSections(data);
+        this._buildDatabaseSections(data, options.tracker);
       })
       .catch(reason => {
         console.error(reason);
@@ -82,22 +92,99 @@ export class Databases extends SidePanel {
 
     const content = this.content as AccordionPanel;
     content.expansionToggled.connect(this._onExpansionToogled, this);
+    this._tracker?.activeCellChanged.connect(this.activeCellChanged, this);
   }
 
-  private _buildDatabaseSections(databases: Databases.IDatabase[]) {
+  /**
+   * Triggered when the main area widget changes.
+   *
+   * @param widget - the current main area widget.
+   */
+  mainAreaWidgetChanged(widget: Widget | null) {
+    if (widget && widget === this._tracker?.currentWidget) {
+      if (!this._isNotebook) {
+        this._isNotebook = true;
+        this.updateSelectButtons(this._tracker?.activeCell?.model);
+      }
+    } else {
+      if (this._isNotebook) {
+        this._isNotebook = false;
+        this.updateSelectButtons(this._tracker?.activeCell?.model);
+      }
+    }
+  }
+
+  /**
+   * Triggered when the active cell changes.
+   */
+  activeCellChanged = (_: INotebookTracker, cell: Cell<ICellModel> | null) => {
+    this._currentCell?.model.metadataChanged.disconnect(
+      this.cellMetadataChanged,
+      this
+    );
+
+    this._currentCell = cell;
+    this.updateSelectButtons(cell?.model);
+
+    this._currentCell?.model.metadataChanged.connect(
+      this.cellMetadataChanged,
+      this
+    );
+  };
+
+  /**
+   * Triggered when the active cell metadata changes.
+   */
+  cellMetadataChanged = (cellModel: ICellModel) => {
+    this.updateSelectButtons(cellModel);
+  };
+
+  /**
+   * Updates the status of the toolbar button to select the cell database.
+   *
+   * @param cellModel - the active cell model.
+   */
+  updateSelectButtons = (cellModel: ICellModel | undefined) => {
+    const enabled = this._isNotebook && SqlCell.isSqlCell(cellModel);
+    this.widgets.forEach(widget => {
+      (widget as DatabaseSection).updateSelectButton(
+        this._isNotebook,
+        enabled,
+        cellModel
+      );
+    });
+  };
+
+  /**
+   * Build the database sections.
+   *
+   * @param databases - the databases description.
+   * @param tracker - the notebook tracker.
+   */
+  private _buildDatabaseSections(
+    databases: Databases.IDatabase[],
+    tracker: INotebookTracker | null
+  ) {
     const content = this.content as AccordionPanel;
     databases.forEach(database => {
-      this.addWidget(new DatabaseSection({ database }));
+      this.addWidget(new DatabaseSection({ database, tracker }));
       content.collapse(content.widgets.length - 1);
     });
   }
 
+  /**
+   * Triggered when the section is expanded.
+   */
   private _onExpansionToogled(_: AccordionPanel, index: number) {
     const section = this.widgets[index] as DatabaseSection;
     if (section.isVisible) {
       section.onExpand();
     }
   }
+
+  private _isNotebook: boolean = false;
+  private _tracker: INotebookTracker | null;
+  private _currentCell: Cell<ICellModel> | null = null;
 }
 
 /**
@@ -108,6 +195,13 @@ namespace Databases {
    * Options of the databases side panel's constructor.
    */
   export interface IOptions {
+    /**
+     * The notebook tracker.
+     */
+    tracker: INotebookTracker | null;
+    /**
+     * The translator.
+     */
     translator: ITranslator;
   }
 
@@ -132,26 +226,75 @@ class DatabaseSection extends PanelWithToolbar {
   constructor(options: DatabaseSection.IOptions) {
     super(options);
     this._database = options.database;
+    this._tracker = options.tracker;
     this.addClass(DATABASE_CLASS);
     this.title.label = this._database.alias;
     this.title.caption = this._tooltip();
-    this.toolbar.addClass(DATABASE_TOOLBAR_CLASS);
+    this.toolbar.addClass(TOOLBAR_CLASS);
 
-    const button = new ToolbarButton({
+    this._selectButton = new ToolbarButton({
+      label: 'SELECT',
+      className: `${SELECT_BUTTON_CLASS} jp-mod-styled`,
+      enabled: SqlCell.isSqlCell(this._tracker?.activeCell?.model),
+      onClick: () => {
+        const model = this._tracker?.activeCell?.model;
+        if (this._selectButton.pressed) {
+          model?.deleteMetadata(DATABASE_METADATA);
+          this.updateSelectButton(true, true, model);
+        } else if (model && SqlCell.isSqlCell(model)) {
+          model.setMetadata(DATABASE_METADATA, this._database);
+          (this.parent?.parent as Databases)?.updateSelectButtons(
+            this._tracker?.activeCell?.model
+          );
+        }
+      }
+    });
+    this.toolbar.addItem('SqlCell-database-select', this._selectButton);
+
+    const deleteButton = new ToolbarButton({
       icon: deleteIcon,
-      className: `${DATABASE_TOOLBAR_BUTTON_CLASS} jp-mod-styled
-      }`,
+      className: 'jp-mod-styled',
       onClick: () => {
         console.log('should remove the database');
       }
     });
-    this.toolbar.addItem('SqlCell-database-delete', button);
+    this.toolbar.addItem('SqlCell-database-delete', deleteButton);
 
     this._body = new TablesList({ database_id: this._database.id });
     this._body.addClass(DATABASE_BODY_CLASS);
     this.addWidget(this._body);
   }
 
+  /**
+   * Update the select button status.
+   *
+   * @param enabled - whether the button is enabled or not.
+   * @param cellModel - the active cell model.
+   */
+  updateSelectButton(
+    visible: boolean,
+    enabled: boolean,
+    cellModel: ICellModel | undefined
+  ) {
+    const button = this._selectButton;
+
+    if (visible) {
+      button.removeClass('lm-mod-hidden');
+    } else {
+      button.addClass('lm-mod-hidden');
+    }
+
+    button.enabled = enabled;
+    const metadata = cellModel?.getMetadata(DATABASE_METADATA);
+    button.pressed = Private.databaseMatch(this._database, metadata);
+
+    // FIXME: should be implemented in ToolbarButton.
+    button.node.ariaPressed = button.pressed.toString();
+  }
+
+  /**
+   * request the server to get the table list on first expand.
+   */
   onExpand() {
     if (!this._tables.length) {
       const searchParams = new URLSearchParams({
@@ -161,7 +304,7 @@ class DatabaseSection extends PanelWithToolbar {
       requestAPI<any>(`schema?${searchParams.toString()}`)
         .then(response => {
           this._tables = (response as DatabaseSection.IDatabaseSchema).data;
-          this._buildTableSections();
+          this._body.updateTables(this._tables);
         })
         .catch(reason => {
           console.error(reason);
@@ -169,6 +312,9 @@ class DatabaseSection extends PanelWithToolbar {
     }
   }
 
+  /**
+   * Build the tooltip text of the toolbar.
+   */
   private _tooltip() {
     let tooltip = '';
     let key: keyof Databases.IDatabase;
@@ -178,13 +324,11 @@ class DatabaseSection extends PanelWithToolbar {
     return tooltip;
   }
 
-  private _buildTableSections() {
-    this._body.updateTables(this._tables);
-  }
-
   private _database: Databases.IDatabase;
+  private _tracker: INotebookTracker | null;
   private _body: TablesList;
   private _tables: string[] = [];
+  private _selectButton: ToolbarButton;
 }
 
 /**
@@ -195,7 +339,14 @@ namespace DatabaseSection {
    * Options for the DatabaseSection constructor.
    */
   export interface IOptions extends Panel.IOptions {
+    /**
+     * The database description.
+     */
     database: Databases.IDatabase;
+    /**
+     * The notebook tracker.
+     */
+    tracker: INotebookTracker | null;
   }
 
   /**
@@ -299,6 +450,7 @@ const Table = ({
         ) : (
           <caretRightIcon.react tag="span" />
         )}
+        <tableRowsIcon.react tag="span" elementSize="small" />
         {name}
       </div>
       <ColumnsList columns={columns} />
@@ -323,3 +475,32 @@ const ColumnsList = ({ columns }: { columns: string[] }): JSX.Element => {
     </ul>
   );
 };
+
+namespace Private {
+  export function databaseMatch(
+    db1: Databases.IDatabase,
+    db2: Databases.IDatabase
+  ): boolean {
+    if (!db1 || !db2) {
+      return false;
+    }
+
+    const keys1 = Object.keys(db1);
+    const keys2 = Object.keys(db2);
+
+    if (keys1.length !== keys2.length) {
+      return false;
+    }
+
+    for (const key of keys1) {
+      if (
+        db1[key as keyof Databases.IDatabase] !==
+        db2[key as keyof Databases.IDatabase]
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+}
