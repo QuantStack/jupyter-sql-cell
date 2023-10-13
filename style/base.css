@@ -98,15 +98,15 @@
   display: none;
 }
 
-.jp-SqlCell-database-selectButton[aria-pressed="true"] {
+.jp-SqlCell-database-selectButton[aria-pressed='true'] {
   background-color: var(--jp-inverse-layout-color3);
 }
 
-.jp-SqlCell-database-selectButton[aria-pressed="true"]:hover {
+.jp-SqlCell-database-selectButton[aria-pressed='true']:hover {
   background-color: var(--jp-inverse-layout-color4);
 }
 
-.jp-SqlCell-database-selectButton[aria-pressed="true"] span {
+.jp-SqlCell-database-selectButton[aria-pressed='true'] span {
   color: var(--jp-ui-inverse-font-color1);
 }
 
