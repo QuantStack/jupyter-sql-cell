@@ -67,7 +67,7 @@ export class SqlWidget extends ReactWidget {
       <UseSignal signal={this._signal}>
         {() => (
           <div
-            className={'sql-cell-widget'}
+            className={'jp-sqlcell-widget'}
             aria-disabled={!SqlCell.isRaw(this._tracker.activeCell?.model)}
           >
             <span>SQL cell</span>
