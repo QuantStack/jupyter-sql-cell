@@ -54,6 +54,9 @@ class SQLConnector:
         if self.database["is_async"]:
             async with self.engine.connect() as conn:
                 schema = await conn.run_sync(self.use_inspector, target, table)
+        else:
+            with self.engine.connect() as conn:
+                schema = self.use_inspector(conn, target, table)
         return schema
 
     def use_inspector(self, conn: AsyncConnection, target: str, table: str) -> [str]:
