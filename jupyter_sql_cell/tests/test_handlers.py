@@ -30,7 +30,7 @@ async def test_execute_default(jp_fetch):
 
     assert response.code == 200
     payload = json.loads(response.body)
-    assert list(payload.keys()) == ["data", "id", "query", "url"]
+    assert list(payload.keys()) == ["alias", "data", "id", "query"]
     assert payload["data"] == [{"Abbreviation": "FR"}]
     assert payload["query"] == query
     assert payload["id"] == "0"
