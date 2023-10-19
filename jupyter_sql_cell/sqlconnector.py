@@ -50,7 +50,7 @@ class SQLConnector:
             else:
                 self.engine = create_engine(self.database["url"])
 
-    async def get_schema(self, target: str, table: str) -> [str]:
+    async def get_schema(self, target: str, table: str = "") -> [str]:
         if self.database["is_async"]:
             async with self.engine.connect() as conn:
                 schema = await conn.run_sync(self.use_inspector, target, table)
