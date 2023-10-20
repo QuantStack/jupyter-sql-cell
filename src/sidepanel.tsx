@@ -444,7 +444,11 @@ const Table = ({
 
   return (
     <li>
-      <div className={TABLE_TITLE_CLASS} onClick={handleClick}>
+      <div
+        className={TABLE_TITLE_CLASS}
+        onClick={handleClick}
+        aria-expanded={expanded ? 'true' : 'false'}
+      >
         {expanded ? (
           <caretDownIcon.react tag="span" />
         ) : (
@@ -468,6 +472,7 @@ const ColumnsList = ({ columns }: { columns: string[] }): JSX.Element => {
   return (
     <ul
       className={COLUMN_ITEMS_CLASS + (columns.length ? '' : ' lm-mod-hidden')}
+      role="region"
     >
       {columns.map(column => (
         <li>{column}</li>

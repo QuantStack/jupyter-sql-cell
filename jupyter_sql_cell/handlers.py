@@ -32,10 +32,10 @@ class ExecuteHandler(APIHandler):
     @tornado.web.authenticated
     def post(self):
         body = json.loads(self.request.body)
-        id = body.get("id", "")
+        id = body.get("id", None)
         query = body.get("query", None)
 
-        if not id:
+        if id is None:
             reply_error(self, "The database id has not been provided")
             return
         if not query:
