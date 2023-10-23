@@ -5,10 +5,21 @@ import {
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
-import { ICommandPalette, IToolbarWidgetRegistry } from '@jupyterlab/apputils';
+import {
+  ICommandPalette,
+  ISessionContext,
+  ISessionContextDialogs,
+  IToolbarWidgetRegistry
+} from '@jupyterlab/apputils';
+import { Cell, ICellModel } from '@jupyterlab/cells';
 import { IEditorServices } from '@jupyterlab/codeeditor';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
-import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
+import {
+  INotebookTracker,
+  Notebook,
+  NotebookActions,
+  NotebookPanel
+} from '@jupyterlab/notebook';
 import { Contents, ContentsManager } from '@jupyterlab/services';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
@@ -19,6 +30,13 @@ import { requestAPI } from './handler';
 import { CommandIDs, SQL_MIMETYPE, SqlCell } from './common';
 import { Databases, DATABASE_METADATA } from './sidepanel';
 import { SqlWidget } from './widget';
+
+const ORIGINAL_RUN = NotebookActions.run;
+const ORIGINAL_RUN_ALL = NotebookActions.runAll;
+const ORIGINAL_RUN_AND_ADVANCE = NotebookActions.runAndAdvance;
+const ORIGINAL_RUN_AND_INSERT = NotebookActions.runAndInsert;
+const ORIGINAL_RUN_ALL_ABOVE = NotebookActions.runAllAbove;
+const ORIGINAL_RUN_ALL_BELOW = NotebookActions.runAllBelow;
 
 /**
  * The sql-cell namespace token.
@@ -42,38 +60,24 @@ const plugin: JupyterFrontEndPlugin<void> = {
   ) => {
     const { commands } = app;
 
-    commands.addCommand(CommandIDs.run, {
+    // Overwrites the core functions to execute also the SQL cells.
+    NotebookActions.run = Private.run;
+    NotebookActions.runAll = Private.runAll;
+    NotebookActions.runAndAdvance = Private.runAndAdvance;
+    NotebookActions.runAndInsert = Private.runAndInsert;
+    NotebookActions.runAllAbove = Private.runAllAbove;
+    NotebookActions.runAllBelow = Private.runAllBelow;
+
+    commands.addCommand(CommandIDs.execute, {
       label: 'Run SQL',
       caption: 'Run SQL',
       icon: runIcon,
       execute: async args => {
         const path = (args?.path || '_sql_output') as string;
+        const cell = (args?.cell ||
+          tracker.activeCell) as Cell<ICellModel> | null;
 
-        const activeCell = tracker.activeCell;
-
-        if (!(activeCell?.model.type === 'raw')) {
-          return;
-        }
-        const database_id =
-          activeCell.model.getMetadata(DATABASE_METADATA)['id'];
-
-        if (database_id === undefined) {
-          console.error('The database has not been set.');
-        }
-        const date = new Date();
-        const source = activeCell?.model.sharedModel.getSource();
-        requestAPI<any>('execute', {
-          method: 'POST',
-          body: JSON.stringify({ query: source, id: database_id })
-        })
-          .then(data => {
-            Private.saveData(path, data.data, date, fileBrowser)
-              .then(dataPath => console.log(`Data saved ${dataPath}`))
-              .catch(undefined);
-          })
-          .catch(reason => {
-            console.error(reason);
-          });
+        Private.executeSqlCell(cell, path, fileBrowser);
       },
       isEnabled: () => SqlCell.isSqlCell(tracker.activeCell?.model),
       isVisible: () => SqlCell.isRaw(tracker.activeCell?.model)
@@ -101,7 +105,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         }
 
         app.commands.notifyCommandChanged(CommandIDs.switchSQL);
-        app.commands.notifyCommandChanged(CommandIDs.run);
+        app.commands.notifyCommandChanged(CommandIDs.execute);
       },
       isVisible: () => SqlCell.isRaw(tracker.activeCell?.model),
       isToggled: () => SqlCell.isSqlCell(tracker.activeCell?.model)
@@ -109,7 +113,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
     if (commandPalette) {
       commandPalette.addItem({
-        command: CommandIDs.run,
+        command: CommandIDs.execute,
         category: 'SQL'
       });
     }
@@ -187,7 +191,11 @@ const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
     const { commands } = app;
 
     const toolbarFactory = (panel: NotebookPanel) => {
-      return new SqlWidget({ commands, commandID: CommandIDs.run, tracker });
+      return new SqlWidget({
+        commands,
+        commandID: CommandIDs.execute,
+        tracker
+      });
     };
 
     toolbarRegistry.addFactory<NotebookPanel>(
@@ -216,6 +224,277 @@ export default [cellFactory, databasesList, notebookToolbarWidget, plugin];
 
 namespace Private {
   /**
+   * Executes an SQL cell.
+   *
+   * @param cell - the cell to execute.
+   * @param path - the path to the resulting file.
+   * @param fileBrowser - the filebrowser widget (optional).
+   */
+  export async function executeSqlCell(
+    cell: Cell<ICellModel> | null,
+    path: string,
+    fileBrowser: IDefaultFileBrowser | null
+  ): Promise<void> {
+    if (!(cell?.model.type === 'raw')) {
+      return;
+    }
+    const database_id = cell.model.getMetadata(DATABASE_METADATA)['id'];
+    if (database_id === undefined) {
+      console.error('The database has not been set.');
+    }
+
+    const date = new Date();
+    const source = cell?.model.sharedModel.getSource();
+    requestAPI<any>('execute', {
+      method: 'POST',
+      body: JSON.stringify({ query: source, id: database_id })
+    })
+      .then(data => {
+        saveData(path, data.data, date, fileBrowser)
+          .then(dataPath => console.log(`Data saved ${dataPath}`))
+          .catch(undefined);
+      })
+      .catch(reason => {
+        console.error(
+          `The jupyter_sql_cell server extension appears to be missing.\n${reason}`
+        );
+      });
+  }
+
+  /**
+   * Executes all selected SQL cells in a notebook.
+   *
+   * @param notebook - the current notebook widget.
+   */
+  export function executeSelectedSqlCells(notebook: Notebook): void {
+    const selected = notebook.widgets.filter((child, index) => {
+      return notebook.isSelectedOrActive(child);
+    });
+
+    selected
+      .filter(cell => SqlCell.isSqlCell(cell.model))
+      .forEach(cell => {
+        executeSqlCell(cell, '_sql_output', null);
+      });
+  }
+
+  /**
+   * Executes all SQL cells in a notebook.
+   *
+   * @param notebook - the current notebook widget.
+   */
+  export function executeAllSqlCells(notebook: Notebook): void {
+    notebook.widgets
+      .filter(cell => SqlCell.isSqlCell(cell.model))
+      .forEach(cell => {
+        executeSqlCell(cell, '_sql_output', null);
+      });
+  }
+
+  /**
+   * Executes all above SQL cells in a notebook.
+   *
+   * @param notebook - the current notebook widget.
+   */
+  export function executeAboveSqlCells(notebook: Notebook): void {
+    notebook.widgets
+      .slice(0, notebook.activeCellIndex)
+      .filter(cell => SqlCell.isSqlCell(cell.model))
+      .forEach(cell => {
+        executeSqlCell(cell, '_sql_output', null);
+      });
+  }
+
+  /**
+   * Executes selected cell and all below SQL cells in a notebook.
+   *
+   * @param notebook - the current notebook widget.
+   */
+  export function executeBelowSqlCells(notebook: Notebook): void {
+    notebook.widgets
+      .slice(notebook.activeCellIndex, notebook.widgets.length)
+      .filter(cell => SqlCell.isSqlCell(cell.model))
+      .forEach(cell => {
+        executeSqlCell(cell, '_sql_output', null);
+      });
+  }
+
+  /**
+   * Run the selected cell(s).
+   *
+   * @param notebook - The target notebook widget.
+   * @param sessionContext - The client session object.
+   * @param sessionDialogs - The session dialogs.
+   * @param translator - The application translator.
+   *
+   * NOTES:
+   * This function overwrites the core jupyterlab function.
+   */
+  export function run(
+    notebook: Notebook,
+    sessionContext?: ISessionContext,
+    sessionDialogs?: ISessionContextDialogs,
+    translator?: ITranslator
+  ): Promise<boolean> {
+    // Execute first all the SQL cells.
+    executeSelectedSqlCells(notebook);
+
+    // Execute the remaining selected cells using the original run command,
+    // which doesn't take into account the raw cells
+    return ORIGINAL_RUN(notebook, sessionContext, sessionDialogs, translator);
+  }
+
+  /**
+   * Run all of the cells in the notebook.
+   *
+   * @param notebook - The target notebook widget.
+   * @param sessionContext - The client session object.
+   * @param sessionDialogs - The session dialogs.
+   * @param translator - The application translator.
+   *
+   * NOTES:
+   * This function overwrites the core jupyterlab function.
+   */
+  export function runAll(
+    notebook: Notebook,
+    sessionContext?: ISessionContext,
+    sessionDialogs?: ISessionContextDialogs,
+    translator?: ITranslator
+  ): Promise<boolean> {
+    // Execute first all the SQL cells.
+    executeAllSqlCells(notebook);
+
+    // Execute the remaining selected cells using the original run command,
+    // which doesn't take into account the raw cells
+    return ORIGINAL_RUN_ALL(
+      notebook,
+      sessionContext,
+      sessionDialogs,
+      translator
+    );
+  }
+
+  /**
+   * Run the selected cell(s) and advance to the next cell.
+   *
+   * @param notebook - The target notebook widget.
+   * @param sessionContext - The client session object.
+   * @param sessionDialogs - The session dialogs.
+   * @param translator - The application translator.
+   *
+   * NOTES:
+   * This function overwrites the core jupyterlab function.
+   */
+  export function runAndAdvance(
+    notebook: Notebook,
+    sessionContext?: ISessionContext,
+    sessionDialogs?: ISessionContextDialogs,
+    translator?: ITranslator
+  ): Promise<boolean> {
+    // Execute first all the SQL cells.
+    executeSelectedSqlCells(notebook);
+
+    // Execute the remaining selected cells using the original run command,
+    // which doesn't take into account the raw cells
+    return ORIGINAL_RUN_AND_ADVANCE(
+      notebook,
+      sessionContext,
+      sessionDialogs,
+      translator
+    );
+  }
+
+  /**
+   * Run the selected cell(s) and insert a new code cell.
+   *
+   * @param notebook - The target notebook widget.
+   * @param sessionContext - The client session object.
+   * @param sessionDialogs - The session dialogs.
+   * @param translator - The application translator.
+   *
+   * NOTES:
+   * This function overwrites the core jupyterlab function.
+   */
+  export function runAndInsert(
+    notebook: Notebook,
+    sessionContext?: ISessionContext,
+    sessionDialogs?: ISessionContextDialogs,
+    translator?: ITranslator
+  ): Promise<boolean> {
+    // Execute first all the SQL cells.
+    executeSelectedSqlCells(notebook);
+
+    // Execute the remaining selected cells using the original run command,
+    // which doesn't take into account the raw cells
+    return ORIGINAL_RUN_AND_INSERT(
+      notebook,
+      sessionContext,
+      sessionDialogs,
+      translator
+    );
+  }
+
+  /**
+   * Run all of the cells before the currently active cell (exclusive).
+   *
+   * @param notebook - The target notebook widget.
+   * @param sessionContext - The client session object.
+   * @param sessionDialogs - The session dialogs.
+   * @param translator - The application translator.
+   *
+   * NOTES:
+   * This function overwrites the core jupyterlab function.
+   */
+  export function runAllAbove(
+    notebook: Notebook,
+    sessionContext?: ISessionContext,
+    sessionDialogs?: ISessionContextDialogs,
+    translator?: ITranslator
+  ): Promise<boolean> {
+    // Execute first all the SQL cells.
+    executeAboveSqlCells(notebook);
+
+    // Execute the remaining selected cells using the original run command,
+    // which doesn't take into account the raw cells
+    return ORIGINAL_RUN_ALL_ABOVE(
+      notebook,
+      sessionContext,
+      sessionDialogs,
+      translator
+    );
+  }
+
+  /**
+   * Run all of the cells after the currently active cell (inclusive).
+   *
+   * @param notebook - The target notebook widget.
+   * @param sessionContext - The client session object.
+   * @param sessionDialogs - The session dialogs.
+   * @param translator - The application translator.
+   *
+   * NOTES:
+   * This function overwrites the core jupyterlab function.
+   */
+  export function runAllBelow(
+    notebook: Notebook,
+    sessionContext?: ISessionContext,
+    sessionDialogs?: ISessionContextDialogs,
+    translator?: ITranslator
+  ): Promise<boolean> {
+    // Execute first all the SQL cells.
+    executeBelowSqlCells(notebook);
+
+    // Execute the remaining selected cells using the original run command,
+    // which doesn't take into account the raw cells
+    return ORIGINAL_RUN_ALL_BELOW(
+      notebook,
+      sessionContext,
+      sessionDialogs,
+      translator
+    );
+  }
+
+  /**
    * Save data in a CSV file.
    *
    * @param path - the path to the directory where to save data.
@@ -232,15 +511,11 @@ namespace Private {
     const parser = new Parser();
     const csv = parser.parse(data);
 
-    const dateText = date
-      .toLocaleString()
-      .replace(/[/:]/g, '-')
-      .replace(/\s/g, '')
-      .replace(',', '_');
+    const dateText = date.toISOString().replace(/[/:]/g, '-');
 
     let currentPath = '';
     if (!path.startsWith('/')) {
-      currentPath = `${fileBrowser?.model.path}/` || '';
+      currentPath = `${fileBrowser?.model.path || ''}/` || '';
     }
 
     for (const directory of path.split('/')) {
