@@ -171,9 +171,11 @@ test.describe('sidebar', () => {
 
   test('Should display tables list', async ({ page }) => {
     const sidepanel = await openSidePanel(page);
-    const titles = sidepanel.locator('.jp-AccordionPanel-title');
-    await titles.first().click();
-    expect(await titles.first().getAttribute('aria-expanded')).toBe('true');
+    const title = sidepanel.locator(
+      '.jp-AccordionPanel-title[aria-label="world Section"]'
+    );
+    await title.locator('.lm-AccordionPanel-titleLabel').click();
+    expect(await title.getAttribute('aria-expanded')).toBe('true');
     const tables = sidepanel.locator('.jp-sqlcell-table-title');
     expect(tables).toHaveCount(1);
     expect(await tables.first().textContent()).toBe('world');
@@ -181,7 +183,10 @@ test.describe('sidebar', () => {
 
   test('Should display columns list', async ({ page }) => {
     const sidepanel = await openSidePanel(page);
-    await sidepanel.locator('.jp-AccordionPanel-title').first().click();
+    await sidepanel
+      .locator('.jp-AccordionPanel-title[aria-label="world Section"]')
+      .locator('.lm-AccordionPanel-titleLabel')
+      .click();
     const table = sidepanel.locator('.jp-sqlcell-table-title');
     await table.click();
     await expect(table).toHaveAttribute('aria-expanded', 'true');
@@ -212,8 +217,9 @@ test.describe('connect database to cell', () => {
   }) => {
     const sidepanel = await openSidePanel(page);
     const button = sidepanel
-      .locator('.jp-AccordionPanel-title .jp-sqlcell-database-selectbutton')
-      .first();
+      .locator('.jp-AccordionPanel-title[aria-label="world Section"]')
+      .locator('.jp-sqlcell-database-selectbutton');
+
     expect(button).toHaveAttribute('aria-disabled', 'true');
     expect(button).toHaveAttribute('aria-pressed', 'false');
 
@@ -239,8 +245,8 @@ test.describe('connect database to cell', () => {
   test('Connect button should be pressed on click', async ({ page }) => {
     const sidepanel = await openSidePanel(page);
     const button = sidepanel
-      .locator('.jp-AccordionPanel-title .jp-sqlcell-database-selectbutton')
-      .first();
+      .locator('.jp-AccordionPanel-title[aria-label="world Section"]')
+      .locator('.jp-sqlcell-database-selectbutton');
 
     await switchCellToSql(page, 2);
     expect(button).toHaveAttribute('aria-pressed', 'false');
@@ -255,8 +261,8 @@ test.describe('connect database to cell', () => {
   test('Should connect a database to a cell', async ({ page, tmpPath }) => {
     const sidepanel = await openSidePanel(page);
     const button = sidepanel
-      .locator('.jp-AccordionPanel-title .jp-sqlcell-database-selectbutton')
-      .first();
+      .locator('.jp-AccordionPanel-title[aria-label="world Section"]')
+      .locator('.jp-sqlcell-database-selectbutton');
 
     await page.notebook.setCell(2, 'raw', 'SELECT * FROM world');
     await switchCellToSql(page, 2);
@@ -281,8 +287,8 @@ test.describe('connect database to cell', () => {
   }) => {
     const sidepanel = await openSidePanel(page);
     const button = sidepanel
-      .locator('.jp-AccordionPanel-title .jp-sqlcell-database-selectbutton')
-      .first();
+      .locator('.jp-AccordionPanel-title[aria-label="world Section"]')
+      .locator('.jp-sqlcell-database-selectbutton');
 
     await page.notebook.setCell(2, 'raw', 'SELECT * FROM albums');
     await switchCellToSql(page, 2);
@@ -306,11 +312,11 @@ test.describe('connect database to cell', () => {
   }) => {
     const sidepanel = await openSidePanel(page);
     const button1 = sidepanel
-      .locator('.jp-AccordionPanel-title .jp-sqlcell-database-selectbutton')
-      .first();
+      .locator('.jp-AccordionPanel-title[aria-label="world Section"]')
+      .locator('.jp-sqlcell-database-selectbutton');
     const button2 = sidepanel
-      .locator('.jp-AccordionPanel-title .jp-sqlcell-database-selectbutton')
-      .last();
+      .locator('.jp-AccordionPanel-title[aria-label="chinook Section"]')
+      .locator('.jp-sqlcell-database-selectbutton');
 
     await page.notebook.setCell(1, 'raw', 'SELECT * FROM world');
     await switchCellToSql(page, 1);
