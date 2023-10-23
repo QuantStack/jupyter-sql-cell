@@ -1,5 +1,7 @@
 import { Parser } from '@json2csv/plainjs';
 import {
+  ILabShell,
+  ILayoutRestorer,
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
@@ -9,12 +11,19 @@ import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 import { Contents, ContentsManager } from '@jupyterlab/services';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
+import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 import { runIcon } from '@jupyterlab/ui-components';
 
 import { CustomContentFactory } from './cellfactory';
 import { requestAPI } from './handler';
 import { CommandIDs, SQL_MIMETYPE, SqlCell } from './common';
+import { Databases, DATABASE_METADATA } from './sidepanel';
 import { SqlWidget } from './widget';
+
+/**
+ * The sql-cell namespace token.
+ */
+const namespace = 'sql-cell';
 
 /**
  * Load the commands and the cell toolbar buttons (from settings).
@@ -45,11 +54,17 @@ const plugin: JupyterFrontEndPlugin<void> = {
         if (!(activeCell?.model.type === 'raw')) {
           return;
         }
+        const database_id =
+          activeCell.model.getMetadata(DATABASE_METADATA)['id'];
+
+        if (database_id === undefined) {
+          console.error('The database has not been set.');
+        }
         const date = new Date();
         const source = activeCell?.model.sharedModel.getSource();
         requestAPI<any>('execute', {
           method: 'POST',
-          body: JSON.stringify({ query: source })
+          body: JSON.stringify({ query: source, id: database_id })
         })
           .then(data => {
             Private.saveData(path, data.data, date, fileBrowser)
@@ -57,9 +72,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
               .catch(undefined);
           })
           .catch(reason => {
-            console.error(
-              `The jupyter_sql_cell server extension appears to be missing.\n${reason}`
-            );
+            console.error(reason);
           });
       },
       isEnabled: () => SqlCell.isSqlCell(tracker.activeCell?.model),
@@ -119,6 +132,44 @@ const cellFactory: JupyterFrontEndPlugin<NotebookPanel.IContentFactory> = {
 };
 
 /**
+ * The side panel to handle the list of databases.
+ */
+const databasesList: JupyterFrontEndPlugin<void> = {
+  id: '@jupyter/sql-cell:databases-list',
+  description: 'The side panel which handle databases list.',
+  autoStart: true,
+  optional: [ILabShell, ILayoutRestorer, INotebookTracker, ITranslator],
+  activate: (
+    app: JupyterFrontEnd,
+    labShell: ILabShell,
+    restorer: ILayoutRestorer | null,
+    tracker: INotebookTracker | null,
+    translator: ITranslator | null
+  ) => {
+    const { shell } = app;
+    if (!translator) {
+      translator = nullTranslator;
+    }
+    const panel = new Databases({ tracker, translator });
+
+    // Restore the widget state
+    if (restorer) {
+      restorer.add(panel, namespace);
+    }
+
+    if (labShell) {
+      labShell.currentChanged.connect(
+        (_: ILabShell, args: ILabShell.IChangedArgs) => {
+          panel.mainAreaWidgetChanged(args.newValue);
+        }
+      );
+    }
+
+    shell.add(panel, 'left');
+  }
+};
+
+/**
  * The notebook toolbar widget.
  */
 const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
@@ -161,7 +212,7 @@ const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
   }
 };
 
-export default [cellFactory, notebookToolbarWidget, plugin];
+export default [cellFactory, databasesList, notebookToolbarWidget, plugin];
 
 namespace Private {
   /**

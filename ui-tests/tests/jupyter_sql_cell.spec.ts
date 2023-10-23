@@ -1,7 +1,35 @@
-import { expect, galata, test } from '@jupyterlab/galata';
+import {
+  IJupyterLabPageFixture,
+  expect,
+  galata,
+  test
+} from '@jupyterlab/galata';
+import { Locator } from '@playwright/test';
 import * as path from 'path';
 
 const fileName = 'simple.ipynb';
+
+async function openSidePanel(page: IJupyterLabPageFixture): Promise<Locator> {
+  const tabBar = page.locator('.jp-SideBar.jp-mod-left');
+  const button = tabBar?.locator('li[title="Databases"]');
+  await button.click();
+  const content = page.locator(
+    '#jp-left-stack .lm-StackedPanel-child:not(.lm-mod-hidden)'
+  );
+  await expect(content).toHaveClass(/jp-sqlcell-databases-panel/);
+  return content;
+}
+
+async function switchCellToSql(
+  page: IJupyterLabPageFixture,
+  index: number
+): Promise<void> {
+  await page.notebook.setCellType(index, 'raw');
+  await (await page.notebook.getCellInput(index))?.click();
+  await page
+    .locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:switch"]')
+    .click();
+}
 
 test.describe('cell toolbar', () => {
   test.beforeEach(async ({ page, request, tmpPath }) => {
@@ -95,10 +123,7 @@ test.describe('cell factory', () => {
     await expect(cells.nth(1)).not.toHaveClass(/jp-SqlCell/);
     await expect(cells.nth(2)).not.toHaveClass(/jp-SqlCell/);
 
-    await (await page.notebook.getCellInput(2))?.click();
-    await page
-      .locator('.jp-cell-toolbar [data-command="jupyter-sql-cell:switch"]')
-      .click();
+    await switchCellToSql(page, 2);
 
     await expect(cells.nth(2)).toHaveClass(/jp-SqlCell/);
   });
@@ -127,5 +152,197 @@ test.describe('cell factory', () => {
         .locator('div[contenteditable="true"]')
         .getAttribute('data-language')
     ).toBe(null);
+  });
+});
+
+test.describe('sidebar', () => {
+  test('There should be a database button on side panel', async ({ page }) => {
+    const tabBar = await page.sidebar.getTabBar('left');
+    const button = await tabBar?.$('li[title="Databases"]');
+    expect(button).not.toBeNull();
+    expect(await button?.screenshot()).toMatchSnapshot('sidebar_icon.png');
+  });
+
+  test('Side panel should have two database', async ({ page }) => {
+    const sidepanel = await openSidePanel(page);
+    const titles = sidepanel.locator('.jp-AccordionPanel-title');
+    expect(titles).toHaveCount(2);
+  });
+
+  test('Should display tables list', async ({ page }) => {
+    const sidepanel = await openSidePanel(page);
+    const title = sidepanel.locator(
+      '.jp-AccordionPanel-title[aria-label="world Section"]'
+    );
+    await title.locator('.lm-AccordionPanel-titleLabel').click();
+    expect(await title.getAttribute('aria-expanded')).toBe('true');
+    const tables = sidepanel.locator('.jp-sqlcell-table-title');
+    expect(tables).toHaveCount(1);
+    expect(await tables.first().textContent()).toBe('world');
+  });
+
+  test('Should display columns list', async ({ page }) => {
+    const sidepanel = await openSidePanel(page);
+    await sidepanel
+      .locator('.jp-AccordionPanel-title[aria-label="world Section"]')
+      .locator('.lm-AccordionPanel-titleLabel')
+      .click();
+    const table = sidepanel.locator('.jp-sqlcell-table-title');
+    await table.click();
+    await expect(table).toHaveAttribute('aria-expanded', 'true');
+    const columns = sidepanel.locator('.jp-sqlcell-column-items li');
+    expect(columns).toHaveCount(35);
+    expect(columns.first()).toContainText('Abbreviation');
+  });
+});
+
+test.describe('connect database to cell', () => {
+  test.beforeEach(async ({ page, request, tmpPath }) => {
+    const contents = galata.newContentsHelper(request);
+    await contents.uploadFile(
+      path.resolve(__dirname, `./notebooks/${fileName}`),
+      `${tmpPath}/${fileName}`
+    );
+    await page.notebook.openByPath(`${tmpPath}/${fileName}`);
+    await page.notebook.activate(fileName);
+  });
+
+  test.afterEach(async ({ request, tmpPath }) => {
+    const contents = galata.newContentsHelper(request);
+    await contents.deleteDirectory(tmpPath);
+  });
+
+  test('Connect button should be enable for SQL cell only', async ({
+    page
+  }) => {
+    const sidepanel = await openSidePanel(page);
+    const button = sidepanel
+      .locator('.jp-AccordionPanel-title[aria-label="world Section"]')
+      .locator('.jp-sqlcell-database-selectbutton');
+
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+
+    expect(await button?.screenshot()).toMatchSnapshot(
+      'connect_button_disabled.png'
+    );
+    await (await page.notebook.getCell(1))?.click();
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+
+    await (await page.notebook.getCell(2))?.click();
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+
+    await switchCellToSql(page, 2);
+    expect(button).toHaveAttribute('aria-disabled', 'false');
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(await button?.screenshot()).toMatchSnapshot(
+      'connect_button_enabled.png'
+    );
+  });
+
+  test('Connect button should be pressed on click', async ({ page }) => {
+    const sidepanel = await openSidePanel(page);
+    const button = sidepanel
+      .locator('.jp-AccordionPanel-title[aria-label="world Section"]')
+      .locator('.jp-sqlcell-database-selectbutton');
+
+    await switchCellToSql(page, 2);
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+
+    await button.click();
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+    expect(await button?.screenshot()).toMatchSnapshot(
+      'connect_button_pressed.png'
+    );
+  });
+
+  test('Should connect a database to a cell', async ({ page, tmpPath }) => {
+    const sidepanel = await openSidePanel(page);
+    const button = sidepanel
+      .locator('.jp-AccordionPanel-title[aria-label="world Section"]')
+      .locator('.jp-sqlcell-database-selectbutton');
+
+    await page.notebook.setCell(2, 'raw', 'SELECT * FROM world');
+    await switchCellToSql(page, 2);
+    await button.click();
+
+    const execute = page.locator(
+      '.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]'
+    );
+    await execute.click();
+
+    await page.sidebar.openTab('filebrowser');
+    const files = page.locator('li.jp-DirListing-item');
+    await page.filebrowser.openDirectory(`${tmpPath}/_sql_output`);
+
+    await expect(files).toHaveCount(1);
+    expect(files.first()).toHaveAttribute('data-file-type', 'csv');
+  });
+
+  test('Should not create an output file with wrong query', async ({
+    page,
+    tmpPath
+  }) => {
+    const sidepanel = await openSidePanel(page);
+    const button = sidepanel
+      .locator('.jp-AccordionPanel-title[aria-label="world Section"]')
+      .locator('.jp-sqlcell-database-selectbutton');
+
+    await page.notebook.setCell(2, 'raw', 'SELECT * FROM albums');
+    await switchCellToSql(page, 2);
+    await button.click();
+
+    const execute = page.locator(
+      '.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]'
+    );
+    await execute.click();
+
+    await page.sidebar.openTab('filebrowser');
+    const opening = await page.filebrowser.openDirectory(
+      `${tmpPath}/_sql_output`
+    );
+    expect(opening).toBeFalsy();
+  });
+
+  test('Should connect several databases to several cells', async ({
+    page,
+    tmpPath
+  }) => {
+    const sidepanel = await openSidePanel(page);
+    const button1 = sidepanel
+      .locator('.jp-AccordionPanel-title[aria-label="world Section"]')
+      .locator('.jp-sqlcell-database-selectbutton');
+    const button2 = sidepanel
+      .locator('.jp-AccordionPanel-title[aria-label="chinook Section"]')
+      .locator('.jp-sqlcell-database-selectbutton');
+
+    await page.notebook.setCell(1, 'raw', 'SELECT * FROM world');
+    await switchCellToSql(page, 1);
+    await button1.click();
+
+    await page.notebook.setCell(2, 'raw', 'SELECT * FROM albums');
+    await switchCellToSql(page, 2);
+    await button2.click();
+
+    const execute = page.locator(
+      '.jp-cell-toolbar [data-command="jupyter-sql-cell:execute"]'
+    );
+    await (await page.notebook.getCellInput(1))?.click();
+    await execute.click();
+
+    await page.sidebar.openTab('filebrowser');
+    const files = page.locator('li.jp-DirListing-item');
+
+    await page.filebrowser.openDirectory(`${tmpPath}/_sql_output`);
+    await expect(files).toHaveCount(1);
+
+    await page.filebrowser.openDirectory(tmpPath);
+
+    await (await page.notebook.getCellInput(2))?.click();
+    await execute.click();
+    await page.filebrowser.openDirectory(`${tmpPath}/_sql_output`);
+    await expect(files).toHaveCount(2);
   });
 });
