@@ -5,7 +5,11 @@ import {
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
-import { ICommandPalette, IToolbarWidgetRegistry } from '@jupyterlab/apputils';
+import {
+  ICommandPalette,
+  ISessionContext,
+  IToolbarWidgetRegistry
+} from '@jupyterlab/apputils';
 import { IEditorServices } from '@jupyterlab/codeeditor';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 import { IMetadataFormProvider } from '@jupyterlab/metadataform';
@@ -14,7 +18,13 @@ import {
   NotebookActions,
   NotebookPanel
 } from '@jupyterlab/notebook';
-import { Contents, ContentsManager } from '@jupyterlab/services';
+import {
+  Contents,
+  ContentsManager,
+  Kernel,
+  KernelMessage,
+  Session
+} from '@jupyterlab/services';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 import {
@@ -28,6 +38,8 @@ import { FieldProps } from '@rjsf/utils';
 import { CustomContentFactory } from './cellfactory';
 import { requestAPI } from './handler';
 import { CommandIDs, SQL_MIMETYPE, SqlCell, objectEnum } from './common';
+import * as injectCode from './injectedCode';
+import { ISqlCellInjection, SqlCellInjection } from './kernelInjection';
 import { Databases } from './sidepanel';
 import { DatabaseSelect, SqlWidget, SqlSwitchWidget } from './widget';
 
@@ -43,11 +55,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
   id: '@jupyter/sql-cell:plugin',
   description: 'Add the commands to the registry.',
   autoStart: true,
-  requires: [INotebookTracker],
+  requires: [INotebookTracker, ISqlCellInjection],
   optional: [ICommandPalette, IDefaultFileBrowser],
   activate: (
     app: JupyterFrontEnd,
     tracker: INotebookTracker,
+    injection: ISqlCellInjection,
     commandPalette: ICommandPalette,
     fileBrowser: IDefaultFileBrowser | null
   ) => {
@@ -73,15 +86,23 @@ const plugin: JupyterFrontEndPlugin<void> = {
           console.error('The database has not been set.');
         }
         const date = new Date();
+        const kernel = tracker.currentWidget?.sessionContext.session?.kernel;
         const source = activeCell?.model.sharedModel.getSource();
         requestAPI<any>('execute', {
           method: 'POST',
           body: JSON.stringify({ query: source, id: database_id })
         })
           .then(data => {
-            Private.saveData(path, data.data, date, fileBrowser)
-              .then(dataPath => console.log(`Data saved ${dataPath}`))
-              .catch(undefined);
+            if (kernel && injection.status) {
+              const future = Private.transferDataToKernel(kernel, data.data);
+              future.done.then(reply => {
+                console.log('REPLY', reply);
+              });
+            } else {
+              Private.saveData(path, data.data, date, fileBrowser)
+                .then(dataPath => console.log(`Data saved ${dataPath}`))
+                .catch(undefined);
+            }
           })
           .catch(reason => {
             console.error(reason);
@@ -251,12 +272,72 @@ const metadataForm: JupyterFrontEndPlugin<void> = {
   }
 };
 
+/*
+ * A plugin to inject a function in the notebook kernel.
+ */
+const kernelFunctionInjector: JupyterFrontEndPlugin<ISqlCellInjection> = {
+  id: '@jupyter/sql-cell:kernel-injection',
+  description: 'A JupyterLab extension to inject a function in notebook kernel',
+  autoStart: true,
+  provides: ISqlCellInjection,
+  requires: [INotebookTracker],
+  activate: (app: JupyterFrontEnd, tracker: INotebookTracker) => {
+    let sessionContext: ISessionContext | undefined = undefined;
+    const injection = new SqlCellInjection();
+
+    /**
+     * Triggered when the current notebook or current kernel changes.
+     */
+    const onKernelChanged = async (
+      _sessionContext: ISessionContext,
+      kernelChange: Session.ISessionConnection.IKernelChangedArgs
+    ) => {
+      injection.status = false;
+      const kernel = kernelChange.newValue;
+      if (kernel) {
+        kernel.info.then(info => {
+          let code = '';
+          if (info.language_info.name === 'python') {
+            code = injectCode.PYTHON_CODE;
+          }
+          if (!code) {
+            return;
+          }
+          const content: KernelMessage.IExecuteRequestMsg['content'] = {
+            code: code
+          };
+          const future = kernel.requestExecute(content);
+          future.done.then(reply => {
+            injection.status = reply.content.status === 'ok';
+          });
+        });
+      }
+    };
+
+    tracker.currentChanged.connect((_, panel) => {
+      sessionContext?.kernelChanged.disconnect(onKernelChanged);
+      sessionContext = panel?.sessionContext;
+      const kernel = sessionContext?.session?.kernel;
+      if (sessionContext && kernel) {
+        onKernelChanged(sessionContext, {
+          name: 'kernel',
+          oldValue: null,
+          newValue: kernel
+        });
+      }
+      sessionContext?.kernelChanged.connect(onKernelChanged);
+    });
+
+    return injection;
+  }
+};
+
 /**
  * The notebook toolbar widget.
  */
 const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
   id: '@jupyter/sql-cell:notebook-toolbar',
-  description: 'A JupyterLab extension to add a widget in the notebook tools',
+  description: 'A JupyterLab extension to add a widget in the Notebook toolbar',
   autoStart: true,
   requires: [INotebookTracker, IToolbarWidgetRegistry],
   optional: [ISettingRegistry],
@@ -298,11 +379,35 @@ export default [
   cellFactory,
   databasesList,
   metadataForm,
+  kernelFunctionInjector,
   notebookToolbarWidget,
   plugin
 ];
 
 namespace Private {
+  /**
+   * Call the function to transfer the data on the kernel.
+   *
+   * @param kernel - kernel on which to transfer the data.
+   * @param data - data to transfer to the kernel (mst be serializable).
+   * @returns the code execution future.
+   */
+  export function transferDataToKernel(
+    kernel: Kernel.IKernelConnection,
+    data: any
+  ): Kernel.IShellFuture<
+    KernelMessage.IExecuteRequestMsg,
+    KernelMessage.IExecuteReplyMsg
+  > {
+    data = JSON.stringify(data).replace(/"/gi, '\\"');
+    const code = `_sql_transfer_data("${data}")`;
+    const content: KernelMessage.IExecuteRequestMsg['content'] = {
+      code: code,
+      stop_on_error: true
+    };
+    return kernel.requestExecute(content, false);
+  }
+
   /**
    * Save data in a CSV file.
    *
