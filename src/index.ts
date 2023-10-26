@@ -8,17 +8,25 @@ import {
 import { ICommandPalette, IToolbarWidgetRegistry } from '@jupyterlab/apputils';
 import { IEditorServices } from '@jupyterlab/codeeditor';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
-import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
+import {
+  INotebookTracker,
+  NotebookActions,
+  NotebookPanel
+} from '@jupyterlab/notebook';
 import { Contents, ContentsManager } from '@jupyterlab/services';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
-import { runIcon } from '@jupyterlab/ui-components';
+import {
+  IFormRenderer,
+  IFormRendererRegistry,
+  runIcon
+} from '@jupyterlab/ui-components';
 
 import { CustomContentFactory } from './cellfactory';
 import { requestAPI } from './handler';
 import { CommandIDs, SQL_MIMETYPE, SqlCell } from './common';
 import { Databases, DATABASE_METADATA } from './sidepanel';
-import { SqlWidget } from './widget';
+import { SqlWidget, SqlSwitchWidget } from './widget';
 
 /**
  * The sql-cell namespace token.
@@ -83,21 +91,23 @@ const plugin: JupyterFrontEndPlugin<void> = {
       label: 'SQL',
       caption: () => {
         const model = tracker.activeCell?.model;
-        return SqlCell.isRaw(model)
-          ? SqlCell.isSqlCell(model)
-            ? 'Switch to Raw'
-            : 'Switch to SQL'
-          : 'Not available';
+        return SqlCell.isSqlCell(model) ? 'Switch to Raw' : 'Switch to SQL';
       },
       execute: async () => {
-        const model = tracker.activeCell?.model;
-        if (!model || model.type !== 'raw') {
+        const notebook = tracker.currentWidget?.content;
+        let model = tracker.activeCell?.model;
+        if (!notebook || !model) {
           return;
         }
-        if (model.getMetadata('format') !== SQL_MIMETYPE) {
-          model.setMetadata('format', SQL_MIMETYPE);
-        } else if (model.getMetadata('format') === SQL_MIMETYPE) {
-          model.deleteMetadata('format');
+        if (model.type !== 'raw') {
+          NotebookActions.changeCellType(notebook, 'raw');
+          // Reassign the model since the cell has been deleted and created again.
+          model = tracker.activeCell?.model;
+        }
+        if (model?.getMetadata('format') !== SQL_MIMETYPE) {
+          model?.setMetadata('format', SQL_MIMETYPE);
+        } else if (model?.getMetadata('format') === SQL_MIMETYPE) {
+          model?.deleteMetadata('format');
         }
 
         app.commands.notifyCommandChanged(CommandIDs.switchSQL);
@@ -169,12 +179,39 @@ const databasesList: JupyterFrontEndPlugin<void> = {
   }
 };
 
+const metadataForm: JupyterFrontEndPlugin<void> = {
+  id: '@jupyter/sql-cell:metadata-form',
+  description:
+    'A JupyterLab extension to add a form in the Notebook tools panel.',
+  autoStart: true,
+  requires: [IFormRendererRegistry, INotebookTracker],
+  activate: (
+    app: JupyterFrontEnd,
+    formRegistry: IFormRendererRegistry,
+    tracker: INotebookTracker
+  ) => {
+    const { commands } = app;
+    const component: IFormRenderer = {
+      fieldRenderer: () => {
+        return SqlSwitchWidget({
+          commands,
+          tracker
+        });
+      }
+    };
+    formRegistry.addRenderer(
+      '@jupyter/sql-cell:sql-switch.renderer',
+      component
+    );
+  }
+};
+
 /**
  * The notebook toolbar widget.
  */
 const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
   id: '@jupyter/sql-cell:notebook-toolbar',
-  description: 'A JupyterLab extension to run SQL in notebook dedicated cells',
+  description: 'A JupyterLab extension to add a widget in the notebook tools',
   autoStart: true,
   requires: [INotebookTracker, IToolbarWidgetRegistry],
   optional: [ISettingRegistry],
@@ -187,7 +224,7 @@ const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
     const { commands } = app;
 
     const toolbarFactory = (panel: NotebookPanel) => {
-      return new SqlWidget({ commands, commandID: CommandIDs.run, tracker });
+      return new SqlWidget({ commands, tracker });
     };
 
     toolbarRegistry.addFactory<NotebookPanel>(
@@ -212,7 +249,13 @@ const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
   }
 };
 
-export default [cellFactory, databasesList, notebookToolbarWidget, plugin];
+export default [
+  cellFactory,
+  databasesList,
+  metadataForm,
+  notebookToolbarWidget,
+  plugin
+];
 
 namespace Private {
   /**

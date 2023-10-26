@@ -1,0 +1,28 @@
+{
+  "jupyter.lab.metadataforms": [
+    {
+      "id": "sqlCellSection",
+      "label": "SQL cell",
+      "metadataSchema": {
+        "type": "object",
+        "properties": {
+          "_SQL-CELL": {
+            "title": "Sql Cell",
+            "type": "null"
+          }
+        }
+      },
+      "metadataOptions": {
+        "_SQL-CELL": {
+          "customRenderer": "@jupyter/sql-cell:sql-switch.renderer"
+        }
+      }
+    }
+  ],
+  "jupyter.lab.shortcuts": [],
+  "title": "@jupyter/sql-cell",
+  "description": "@jupyter/sql-cell settings.",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

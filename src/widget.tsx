@@ -31,13 +31,6 @@ export class SqlWidget extends ReactWidget {
   }
 
   /**
-   * Switch the status of the cell, SQL cell or not.
-   */
-  private _switch() {
-    this._commands.execute(CommandIDs.switchSQL);
-  }
-
-  /**
    * A signal used to handle the metadata changed on the current cell.
    *
    * ## FIXME:
@@ -66,22 +59,12 @@ export class SqlWidget extends ReactWidget {
     return (
       <UseSignal signal={this._signal}>
         {() => (
-          <div
-            className={'jp-sqlcell-widget'}
-            aria-disabled={!SqlCell.isRaw(this._tracker.activeCell?.model)}
-          >
+          <div className={'jp-sqlcell-toolbar-widget'}>
             <span>SQL cell</span>
-            <label className={'switch'}>
-              <input
-                type={'checkbox'}
-                className={'sql-cell-check'}
-                disabled={!SqlCell.isRaw(this._tracker.activeCell?.model)}
-                aria-disabled={!SqlCell.isRaw(this._tracker.activeCell?.model)}
-                onChange={this._switch.bind(this)}
-                checked={SqlCell.isSqlCell(this._tracker.activeCell?.model)}
-              />
-              <span className={'slider'}></span>
-            </label>
+            <SqlSwitchWidget
+              commands={this._commands}
+              tracker={this._tracker}
+            ></SqlSwitchWidget>
             <ToolbarButtonComponent
               enabled={SqlCell.isSqlCell(this._tracker.activeCell?.model)}
               icon={runIcon}
@@ -107,6 +90,29 @@ export class SqlWidget extends ReactWidget {
   private _signal = new Signal<this, void>(this);
 }
 
+export const SqlSwitchWidget = (options: Private.IOptions): JSX.Element => {
+  const { commands, tracker } = options;
+
+  const switchToSql = () => {
+    commands.execute(CommandIDs.switchSQL);
+  };
+
+  return (
+    <div className={'jp-sqlcell-widget'}>
+      <span>Switch to SQL</span>
+      <label className={'sql-cell-switch'}>
+        <input
+          type={'checkbox'}
+          className={'sql-cell-check'}
+          onChange={switchToSql}
+          checked={SqlCell.isSqlCell(tracker.activeCell?.model)}
+        />
+        <span className={'slider'}></span>
+      </label>
+    </div>
+  );
+};
+
 /**
  * The Private namespace.
  */
@@ -116,7 +122,6 @@ namespace Private {
    */
   export interface IOptions {
     commands: CommandRegistry;
-    commandID: string;
     tracker: INotebookTracker;
   }
 }
