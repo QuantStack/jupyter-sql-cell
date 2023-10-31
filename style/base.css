@@ -67,16 +67,16 @@ ul.jp-sqlcell-column-items {
   align-items: center;
 }
 
+.jp-sqlcell-widget {
+  display: flex;
+}
+
 .jp-sqlcell-toolbar-widget .jp-sqlcell-widget > span {
   display: none;
 }
 
 .jp-sqlcell-toolbar-widget .jp-sqlcell-widget {
   align-items: center;
-}
-
-.jp-sqlcell-widget {
-  display: flex;
 }
 
 .jp-sqlcell-switch {
