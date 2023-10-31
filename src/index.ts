@@ -93,8 +93,13 @@ const plugin: JupyterFrontEndPlugin<void> = {
           body: JSON.stringify({ query: source, id: database_id })
         })
           .then(data => {
-            if (kernel && injection.status) {
-              const future = Private.transferDataToKernel(kernel, data.data);
+            const variable = SqlCell.getMetadata(activeCell.model, 'variable');
+            if (kernel && injection.status && variable) {
+              const future = Private.transferDataToKernel(
+                kernel,
+                data.data,
+                variable
+              );
               future.done.then(reply => {
                 console.log('REPLY', reply);
               });
@@ -394,13 +399,15 @@ namespace Private {
    */
   export function transferDataToKernel(
     kernel: Kernel.IKernelConnection,
-    data: any
+    data: any,
+    variable?: string
   ): Kernel.IShellFuture<
     KernelMessage.IExecuteRequestMsg,
     KernelMessage.IExecuteReplyMsg
   > {
     data = JSON.stringify(data).replace(/"/gi, '\\"');
-    const code = `_sql_transfer_data("${data}")`;
+    const variableStr = variable ? `, "${variable}"` : '';
+    const code = `_sql_transfer_data("${data}"${variableStr})`;
     const content: KernelMessage.IExecuteRequestMsg['content'] = {
       code: code,
       stop_on_error: true
