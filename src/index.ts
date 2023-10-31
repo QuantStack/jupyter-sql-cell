@@ -241,7 +241,7 @@ const metadataForm: JupyterFrontEndPlugin<void> = {
     // A widget to associate a database to the cell.
     const databaseSelect: IFormRenderer = {
       fieldRenderer: (props: FieldProps) => {
-        return DatabaseSelect(props);
+        return DatabaseSelect({ ...props, tracker });
       }
     };
     formRegistry.addRenderer(

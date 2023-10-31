@@ -120,7 +120,7 @@ export const SqlSwitchWidget = (options: Private.IOptions): JSX.Element => {
 /**
  * A field including a select to associate a database.
  */
-export const DatabaseSelect = (props: FieldProps) => {
+export const DatabaseSelect = (props: Private.ISelectProps) => {
   const onChange = (event: React.FormEvent) => {
     const value = (event.target as HTMLOptionElement).value;
     const select = props.schema.oneOf?.find(
@@ -131,7 +131,11 @@ export const DatabaseSelect = (props: FieldProps) => {
   return (
     <div>
       <div className="jp-FormGroup-fieldLabel">{props.schema.title}</div>
-      <select onChange={onChange} className={'form-control jp-sqlcell-select'}>
+      <select
+        onChange={onChange}
+        className={'form-control jp-sqlcell-select'}
+        disabled={!SqlCell.isSqlCell(props.tracker.activeCell?.model)}
+      >
         {props.schema.oneOf?.map(oneOf => {
           return <option>{(oneOf as objectEnum).title}</option>;
         })}
@@ -149,6 +153,13 @@ namespace Private {
    */
   export interface IOptions {
     commands: CommandRegistry;
+    tracker: INotebookTracker;
+  }
+
+  /**
+   * The database select props.
+   */
+  export interface ISelectProps extends FieldProps {
     tracker: INotebookTracker;
   }
 }
