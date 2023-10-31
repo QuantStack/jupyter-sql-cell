@@ -8,6 +8,7 @@ import {
 import { ICommandPalette, IToolbarWidgetRegistry } from '@jupyterlab/apputils';
 import { IEditorServices } from '@jupyterlab/codeeditor';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
+import { IMetadataFormProvider } from '@jupyterlab/metadataform';
 import {
   INotebookTracker,
   NotebookActions,
@@ -21,12 +22,14 @@ import {
   IFormRendererRegistry,
   runIcon
 } from '@jupyterlab/ui-components';
+import { PartialJSONObject } from '@lumino/coreutils';
+import { FieldProps } from '@rjsf/utils';
 
 import { CustomContentFactory } from './cellfactory';
 import { requestAPI } from './handler';
-import { CommandIDs, SQL_MIMETYPE, SqlCell } from './common';
-import { Databases, DATABASE_METADATA } from './sidepanel';
-import { SqlWidget, SqlSwitchWidget } from './widget';
+import { CommandIDs, SQL_MIMETYPE, SqlCell, objectEnum } from './common';
+import { Databases } from './sidepanel';
+import { DatabaseSelect, SqlWidget, SqlSwitchWidget } from './widget';
 
 /**
  * The sql-cell namespace token.
@@ -62,8 +65,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
         if (!(activeCell?.model.type === 'raw')) {
           return;
         }
-        const database_id =
-          activeCell.model.getMetadata(DATABASE_METADATA)['id'];
+        const database_id = SqlCell.getMetadata(activeCell.model, 'database')[
+          'id'
+        ];
 
         if (database_id === undefined) {
           console.error('The database has not been set.');
@@ -148,11 +152,18 @@ const databasesList: JupyterFrontEndPlugin<void> = {
   id: '@jupyter/sql-cell:databases-list',
   description: 'The side panel which handle databases list.',
   autoStart: true,
-  optional: [ILabShell, ILayoutRestorer, INotebookTracker, ITranslator],
+  optional: [
+    ILabShell,
+    ILayoutRestorer,
+    IMetadataFormProvider,
+    INotebookTracker,
+    ITranslator
+  ],
   activate: (
     app: JupyterFrontEnd,
     labShell: ILabShell,
     restorer: ILayoutRestorer | null,
+    metadataForms: IMetadataFormProvider | null,
     tracker: INotebookTracker | null,
     translator: ITranslator | null
   ) => {
@@ -161,6 +172,27 @@ const databasesList: JupyterFrontEndPlugin<void> = {
       translator = nullTranslator;
     }
     const panel = new Databases({ tracker, translator });
+
+    if (metadataForms) {
+      // Update the databases list in the metadata form.
+      panel.databaseUpdated.connect((_, databases) => {
+        const properties: PartialJSONObject = { oneOf: [] };
+        (properties!.oneOf as objectEnum[])!.push({
+          const: null,
+          title: '-'
+        });
+        databases.forEach(db => {
+          const dbJson = JSON.parse(JSON.stringify(db));
+          (properties!.oneOf as objectEnum[])!.push({
+            const: dbJson,
+            title: db.alias
+          });
+        });
+        metadataForms
+          .get('sqlCellSection')!
+          .setProperties('/sql-cell/database', properties);
+      });
+    }
 
     // Restore the widget state
     if (restorer) {
@@ -179,6 +211,9 @@ const databasesList: JupyterFrontEndPlugin<void> = {
   }
 };
 
+/**
+ * The plugin to add a form interacting with cell metadata, in the notebook tools.
+ */
 const metadataForm: JupyterFrontEndPlugin<void> = {
   id: '@jupyter/sql-cell:metadata-form',
   description:
@@ -191,7 +226,9 @@ const metadataForm: JupyterFrontEndPlugin<void> = {
     tracker: INotebookTracker
   ) => {
     const { commands } = app;
-    const component: IFormRenderer = {
+
+    // The widget to toggle to SQL cell.
+    const switcher: IFormRenderer = {
       fieldRenderer: () => {
         return SqlSwitchWidget({
           commands,
@@ -199,9 +236,17 @@ const metadataForm: JupyterFrontEndPlugin<void> = {
         });
       }
     };
+    formRegistry.addRenderer('@jupyter/sql-cell:switch.renderer', switcher);
+
+    // A widget to associate a database to the cell.
+    const databaseSelect: IFormRenderer = {
+      fieldRenderer: (props: FieldProps) => {
+        return DatabaseSelect(props);
+      }
+    };
     formRegistry.addRenderer(
-      '@jupyter/sql-cell:sql-switch.renderer',
-      component
+      '@jupyter/sql-cell:database-select.renderer',
+      databaseSelect
     );
   }
 };

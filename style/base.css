@@ -48,6 +48,19 @@ ul.jp-sqlcell-column-items {
 
 /* NOTEBOOK TOOLBAR WIDGET */
 
+.jp-sqlcell-select {
+  width: 100%;
+  font-size: var(--jp-content-font-size2);
+  border-color: var(--jp-input-border-color);
+  border-style: solid;
+  border-radius: var(--jp-border-radius);
+  border-width: 1px;
+  padding: 6px 8px;
+  background: none;
+  color: var(--jp-ui-font-color0);
+  height: inherit;
+}
+
 .jp-sqlcell-toolbar-widget {
   display: flex;
   border: solid 1px;
@@ -66,21 +79,21 @@ ul.jp-sqlcell-column-items {
   display: flex;
 }
 
-.sql-cell-switch {
+.jp-sqlcell-switch {
   display: flex;
   height: 100%;
   padding-left: 3px;
 }
 
 /* Hide default HTML checkbox */
-.sql-cell-switch input {
+.jp-sqlcell-switch input {
   opacity: 0;
   width: 0;
   height: 0;
 }
 
 /* The slider */
-.sql-cell-switch .slider {
+.jp-sqlcell-switch .slider {
   cursor: pointer;
   height: 15px;
   width: 30px;
@@ -90,7 +103,7 @@ ul.jp-sqlcell-column-items {
   border-radius: 15px;
 }
 
-.sql-cell-switch .slider::before {
+.jp-sqlcell-switch .slider::before {
   display: block;
   content: '';
   height: 15px;
@@ -101,20 +114,20 @@ ul.jp-sqlcell-column-items {
   border-radius: 50%;
 }
 
-.sql-cell-switch input:checked + .slider {
+.jp-sqlcell-switch input:checked + .slider {
   background-color: var(--md-blue-500);
 }
 
-.sql-cell-switch input:focus + .slider {
+.jp-sqlcell-switch input:focus + .slider {
   box-shadow: 0 0 1px var(--md-blue-500);
 }
 
-.sql-cell-switch input:disabled + .slider {
+.jp-sqlcell-switch input:disabled + .slider {
   background-color: var(--jp-layout-color2);
   cursor: not-allowed;
 }
 
-.sql-cell-switch input:checked + .slider::before {
+.jp-sqlcell-switch input:checked + .slider::before {
   -webkit-transform: translateX(15px);
   -ms-transform: translateX(15px);
   transform: translateX(15px);

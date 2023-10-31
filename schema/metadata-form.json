@@ -9,12 +9,25 @@
           "_SQL-CELL": {
             "title": "Sql Cell",
             "type": "null"
+          },
+          "/sql-cell/database": {
+            "title": "Database",
+            "type": "object",
+            "oneOf": [
+              {
+                "const": null,
+                "title": "-"
+              }
+            ]
           }
         }
       },
       "metadataOptions": {
         "_SQL-CELL": {
-          "customRenderer": "@jupyter/sql-cell:sql-switch.renderer"
+          "customRenderer": "@jupyter/sql-cell:switch.renderer"
+        },
+        "/sql-cell/database": {
+          "customRenderer": "@jupyter/sql-cell:database-select.renderer"
         }
       }
     }

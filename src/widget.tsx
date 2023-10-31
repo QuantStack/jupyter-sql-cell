@@ -9,8 +9,9 @@ import {
 import { CommandRegistry } from '@lumino/commands';
 import { Signal } from '@lumino/signaling';
 import * as React from 'react';
+import { FieldProps } from '@rjsf/utils';
 
-import { CommandIDs, SqlCell } from './common';
+import { CommandIDs, SqlCell, objectEnum } from './common';
 
 export class SqlWidget extends ReactWidget {
   /**
@@ -90,6 +91,9 @@ export class SqlWidget extends ReactWidget {
   private _signal = new Signal<this, void>(this);
 }
 
+/**
+ * A toggle button used to switch a cell to SQL cell.
+ */
 export const SqlSwitchWidget = (options: Private.IOptions): JSX.Element => {
   const { commands, tracker } = options;
 
@@ -100,15 +104,38 @@ export const SqlSwitchWidget = (options: Private.IOptions): JSX.Element => {
   return (
     <div className={'jp-sqlcell-widget'}>
       <span>Switch to SQL</span>
-      <label className={'sql-cell-switch'}>
+      <label className={'jp-sqlcell-switch'}>
         <input
           type={'checkbox'}
-          className={'sql-cell-check'}
+          className={'jp-sqlcell-check'}
           onChange={switchToSql}
           checked={SqlCell.isSqlCell(tracker.activeCell?.model)}
         />
         <span className={'slider'}></span>
       </label>
+    </div>
+  );
+};
+
+/**
+ * A field including a select to associate a database.
+ */
+export const DatabaseSelect = (props: FieldProps) => {
+  const onChange = (event: React.FormEvent) => {
+    const value = (event.target as HTMLOptionElement).value;
+    const select = props.schema.oneOf?.find(
+      oneOf => (oneOf as objectEnum).title === value
+    );
+    props.onChange((select as objectEnum).const);
+  };
+  return (
+    <div>
+      <div className="jp-FormGroup-fieldLabel">{props.schema.title}</div>
+      <select onChange={onChange} className={'form-control jp-sqlcell-select'}>
+        {props.schema.oneOf?.map(oneOf => {
+          return <option>{(oneOf as objectEnum).title}</option>;
+        })}
+      </select>
     </div>
   );
 };
