@@ -13,18 +13,13 @@ import {
   deleteIcon,
   tableRowsIcon
 } from '@jupyterlab/ui-components';
-import { Signal } from '@lumino/signaling';
+import { ISignal, Signal } from '@lumino/signaling';
 import { AccordionPanel, Panel, Widget } from '@lumino/widgets';
 import * as React from 'react';
 
 import { SqlCell } from './common';
 import { requestAPI } from './handler';
 import databaseSvgstr from '../style/icons/database.svg';
-
-/**
- * The metadata key to store the database.
- */
-export const DATABASE_METADATA = 'sqlcell-database';
 
 /**
  * The class of the side panel.
@@ -85,6 +80,7 @@ export class Databases extends SidePanel {
     requestAPI<any>('databases')
       .then(data => {
         this._buildDatabaseSections(data, options.tracker);
+        this._databasesUpdated.emit(data);
       })
       .catch(reason => {
         console.error(reason);
@@ -93,6 +89,13 @@ export class Databases extends SidePanel {
     const content = this.content as AccordionPanel;
     content.expansionToggled.connect(this._onExpansionToogled, this);
     this._tracker?.activeCellChanged.connect(this.activeCellChanged, this);
+  }
+
+  /**
+   * A signal emitting when the databases are updated.
+   */
+  get databaseUpdated(): ISignal<this, Databases.IDatabase[]> {
+    return this._databasesUpdated;
   }
 
   /**
@@ -185,6 +188,7 @@ export class Databases extends SidePanel {
   private _isNotebook: boolean = false;
   private _tracker: INotebookTracker | null;
   private _currentCell: Cell<ICellModel> | null = null;
+  private _databasesUpdated = new Signal<this, Databases.IDatabase[]>(this);
 }
 
 /**
@@ -239,10 +243,10 @@ class DatabaseSection extends PanelWithToolbar {
       onClick: () => {
         const model = this._tracker?.activeCell?.model;
         if (this._selectButton.pressed) {
-          model?.deleteMetadata(DATABASE_METADATA);
+          SqlCell.deleteMetadata(model, 'database');
           this.updateSelectButton(true, true, model);
         } else if (model && SqlCell.isSqlCell(model)) {
-          model.setMetadata(DATABASE_METADATA, this._database);
+          SqlCell.setMetadata(model, 'database', this._database);
           (this.parent?.parent as Databases)?.updateSelectButtons(
             this._tracker?.activeCell?.model
           );
@@ -285,7 +289,7 @@ class DatabaseSection extends PanelWithToolbar {
     }
 
     button.enabled = enabled;
-    const metadata = cellModel?.getMetadata(DATABASE_METADATA);
+    const metadata = SqlCell.getMetadata(cellModel, 'database');
     button.pressed = Private.databaseMatch(this._database, metadata);
 
     // FIXME: should be implemented in ToolbarButton.

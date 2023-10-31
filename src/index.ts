@@ -8,17 +8,28 @@ import {
 import { ICommandPalette, IToolbarWidgetRegistry } from '@jupyterlab/apputils';
 import { IEditorServices } from '@jupyterlab/codeeditor';
 import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
-import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
+import { IMetadataFormProvider } from '@jupyterlab/metadataform';
+import {
+  INotebookTracker,
+  NotebookActions,
+  NotebookPanel
+} from '@jupyterlab/notebook';
 import { Contents, ContentsManager } from '@jupyterlab/services';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
-import { runIcon } from '@jupyterlab/ui-components';
+import {
+  IFormRenderer,
+  IFormRendererRegistry,
+  runIcon
+} from '@jupyterlab/ui-components';
+import { PartialJSONObject } from '@lumino/coreutils';
+import { FieldProps } from '@rjsf/utils';
 
 import { CustomContentFactory } from './cellfactory';
 import { requestAPI } from './handler';
-import { CommandIDs, SQL_MIMETYPE, SqlCell } from './common';
-import { Databases, DATABASE_METADATA } from './sidepanel';
-import { SqlWidget } from './widget';
+import { CommandIDs, SQL_MIMETYPE, SqlCell, objectEnum } from './common';
+import { Databases } from './sidepanel';
+import { DatabaseSelect, SqlWidget, SqlSwitchWidget } from './widget';
 
 /**
  * The sql-cell namespace token.
@@ -54,8 +65,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
         if (!(activeCell?.model.type === 'raw')) {
           return;
         }
-        const database_id =
-          activeCell.model.getMetadata(DATABASE_METADATA)['id'];
+        const database_id = SqlCell.getMetadata(activeCell.model, 'database')[
+          'id'
+        ];
 
         if (database_id === undefined) {
           console.error('The database has not been set.');
@@ -83,21 +95,23 @@ const plugin: JupyterFrontEndPlugin<void> = {
       label: 'SQL',
       caption: () => {
         const model = tracker.activeCell?.model;
-        return SqlCell.isRaw(model)
-          ? SqlCell.isSqlCell(model)
-            ? 'Switch to Raw'
-            : 'Switch to SQL'
-          : 'Not available';
+        return SqlCell.isSqlCell(model) ? 'Switch to Raw' : 'Switch to SQL';
       },
       execute: async () => {
-        const model = tracker.activeCell?.model;
-        if (!model || model.type !== 'raw') {
+        const notebook = tracker.currentWidget?.content;
+        let model = tracker.activeCell?.model;
+        if (!notebook || !model) {
           return;
         }
-        if (model.getMetadata('format') !== SQL_MIMETYPE) {
-          model.setMetadata('format', SQL_MIMETYPE);
-        } else if (model.getMetadata('format') === SQL_MIMETYPE) {
-          model.deleteMetadata('format');
+        if (model.type !== 'raw') {
+          NotebookActions.changeCellType(notebook, 'raw');
+          // Reassign the model since the cell has been deleted and created again.
+          model = tracker.activeCell?.model;
+        }
+        if (model?.getMetadata('format') !== SQL_MIMETYPE) {
+          model?.setMetadata('format', SQL_MIMETYPE);
+        } else if (model?.getMetadata('format') === SQL_MIMETYPE) {
+          model?.deleteMetadata('format');
         }
 
         app.commands.notifyCommandChanged(CommandIDs.switchSQL);
@@ -138,11 +152,18 @@ const databasesList: JupyterFrontEndPlugin<void> = {
   id: '@jupyter/sql-cell:databases-list',
   description: 'The side panel which handle databases list.',
   autoStart: true,
-  optional: [ILabShell, ILayoutRestorer, INotebookTracker, ITranslator],
+  optional: [
+    ILabShell,
+    ILayoutRestorer,
+    IMetadataFormProvider,
+    INotebookTracker,
+    ITranslator
+  ],
   activate: (
     app: JupyterFrontEnd,
     labShell: ILabShell,
     restorer: ILayoutRestorer | null,
+    metadataForms: IMetadataFormProvider | null,
     tracker: INotebookTracker | null,
     translator: ITranslator | null
   ) => {
@@ -151,6 +172,27 @@ const databasesList: JupyterFrontEndPlugin<void> = {
       translator = nullTranslator;
     }
     const panel = new Databases({ tracker, translator });
+
+    if (metadataForms) {
+      // Update the databases list in the metadata form.
+      panel.databaseUpdated.connect((_, databases) => {
+        const properties: PartialJSONObject = { oneOf: [] };
+        (properties!.oneOf as objectEnum[])!.push({
+          const: null,
+          title: '-'
+        });
+        databases.forEach(db => {
+          const dbJson = JSON.parse(JSON.stringify(db));
+          (properties!.oneOf as objectEnum[])!.push({
+            const: dbJson,
+            title: db.alias
+          });
+        });
+        metadataForms
+          .get('sqlCellSection')!
+          .setProperties('/sql-cell/database', properties);
+      });
+    }
 
     // Restore the widget state
     if (restorer) {
@@ -170,11 +212,51 @@ const databasesList: JupyterFrontEndPlugin<void> = {
 };
 
 /**
+ * The plugin to add a form interacting with cell metadata, in the notebook tools.
+ */
+const metadataForm: JupyterFrontEndPlugin<void> = {
+  id: '@jupyter/sql-cell:metadata-form',
+  description:
+    'A JupyterLab extension to add a form in the Notebook tools panel.',
+  autoStart: true,
+  requires: [IFormRendererRegistry, INotebookTracker],
+  activate: (
+    app: JupyterFrontEnd,
+    formRegistry: IFormRendererRegistry,
+    tracker: INotebookTracker
+  ) => {
+    const { commands } = app;
+
+    // The widget to toggle to SQL cell.
+    const switcher: IFormRenderer = {
+      fieldRenderer: () => {
+        return SqlSwitchWidget({
+          commands,
+          tracker
+        });
+      }
+    };
+    formRegistry.addRenderer('@jupyter/sql-cell:switch.renderer', switcher);
+
+    // A widget to associate a database to the cell.
+    const databaseSelect: IFormRenderer = {
+      fieldRenderer: (props: FieldProps) => {
+        return DatabaseSelect({ ...props, tracker });
+      }
+    };
+    formRegistry.addRenderer(
+      '@jupyter/sql-cell:database-select.renderer',
+      databaseSelect
+    );
+  }
+};
+
+/**
  * The notebook toolbar widget.
  */
 const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
   id: '@jupyter/sql-cell:notebook-toolbar',
-  description: 'A JupyterLab extension to run SQL in notebook dedicated cells',
+  description: 'A JupyterLab extension to add a widget in the notebook tools',
   autoStart: true,
   requires: [INotebookTracker, IToolbarWidgetRegistry],
   optional: [ISettingRegistry],
@@ -187,7 +269,7 @@ const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
     const { commands } = app;
 
     const toolbarFactory = (panel: NotebookPanel) => {
-      return new SqlWidget({ commands, commandID: CommandIDs.run, tracker });
+      return new SqlWidget({ commands, tracker });
     };
 
     toolbarRegistry.addFactory<NotebookPanel>(
@@ -212,7 +294,13 @@ const notebookToolbarWidget: JupyterFrontEndPlugin<void> = {
   }
 };
 
-export default [cellFactory, databasesList, notebookToolbarWidget, plugin];
+export default [
+  cellFactory,
+  databasesList,
+  metadataForm,
+  notebookToolbarWidget,
+  plugin
+];
 
 namespace Private {
   /**

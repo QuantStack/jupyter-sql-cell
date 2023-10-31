@@ -9,8 +9,9 @@ import {
 import { CommandRegistry } from '@lumino/commands';
 import { Signal } from '@lumino/signaling';
 import * as React from 'react';
+import { FieldProps } from '@rjsf/utils';
 
-import { CommandIDs, SqlCell } from './common';
+import { CommandIDs, SqlCell, objectEnum } from './common';
 
 export class SqlWidget extends ReactWidget {
   /**
@@ -28,13 +29,6 @@ export class SqlWidget extends ReactWidget {
    */
   private _run() {
     this._commands.execute(CommandIDs.run);
-  }
-
-  /**
-   * Switch the status of the cell, SQL cell or not.
-   */
-  private _switch() {
-    this._commands.execute(CommandIDs.switchSQL);
   }
 
   /**
@@ -66,22 +60,12 @@ export class SqlWidget extends ReactWidget {
     return (
       <UseSignal signal={this._signal}>
         {() => (
-          <div
-            className={'jp-sqlcell-widget'}
-            aria-disabled={!SqlCell.isRaw(this._tracker.activeCell?.model)}
-          >
+          <div className={'jp-sqlcell-toolbar-widget'}>
             <span>SQL cell</span>
-            <label className={'switch'}>
-              <input
-                type={'checkbox'}
-                className={'sql-cell-check'}
-                disabled={!SqlCell.isRaw(this._tracker.activeCell?.model)}
-                aria-disabled={!SqlCell.isRaw(this._tracker.activeCell?.model)}
-                onChange={this._switch.bind(this)}
-                checked={SqlCell.isSqlCell(this._tracker.activeCell?.model)}
-              />
-              <span className={'slider'}></span>
-            </label>
+            <SqlSwitchWidget
+              commands={this._commands}
+              tracker={this._tracker}
+            ></SqlSwitchWidget>
             <ToolbarButtonComponent
               enabled={SqlCell.isSqlCell(this._tracker.activeCell?.model)}
               icon={runIcon}
@@ -108,6 +92,59 @@ export class SqlWidget extends ReactWidget {
 }
 
 /**
+ * A toggle button used to switch a cell to SQL cell.
+ */
+export const SqlSwitchWidget = (options: Private.IOptions): JSX.Element => {
+  const { commands, tracker } = options;
+
+  const switchToSql = () => {
+    commands.execute(CommandIDs.switchSQL);
+  };
+
+  return (
+    <div className={'jp-sqlcell-widget'}>
+      <span>Switch to SQL</span>
+      <label className={'jp-sqlcell-switch'}>
+        <input
+          type={'checkbox'}
+          className={'jp-sqlcell-check'}
+          onChange={switchToSql}
+          checked={SqlCell.isSqlCell(tracker.activeCell?.model)}
+        />
+        <span className={'slider'}></span>
+      </label>
+    </div>
+  );
+};
+
+/**
+ * A field including a select to associate a database.
+ */
+export const DatabaseSelect = (props: Private.ISelectProps) => {
+  const onChange = (event: React.FormEvent) => {
+    const value = (event.target as HTMLOptionElement).value;
+    const select = props.schema.oneOf?.find(
+      oneOf => (oneOf as objectEnum).title === value
+    );
+    props.onChange((select as objectEnum).const);
+  };
+  return (
+    <div>
+      <div className="jp-FormGroup-fieldLabel">{props.schema.title}</div>
+      <select
+        onChange={onChange}
+        className={'form-control jp-sqlcell-select'}
+        disabled={!SqlCell.isSqlCell(props.tracker.activeCell?.model)}
+      >
+        {props.schema.oneOf?.map(oneOf => {
+          return <option>{(oneOf as objectEnum).title}</option>;
+        })}
+      </select>
+    </div>
+  );
+};
+
+/**
  * The Private namespace.
  */
 namespace Private {
@@ -116,7 +153,13 @@ namespace Private {
    */
   export interface IOptions {
     commands: CommandRegistry;
-    commandID: string;
+    tracker: INotebookTracker;
+  }
+
+  /**
+   * The database select props.
+   */
+  export interface ISelectProps extends FieldProps {
     tracker: INotebookTracker;
   }
 }

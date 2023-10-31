@@ -48,33 +48,52 @@ ul.jp-sqlcell-column-items {
 
 /* NOTEBOOK TOOLBAR WIDGET */
 
-.jp-sqlcell-widget {
+.jp-sqlcell-select {
+  width: 100%;
+  font-size: var(--jp-content-font-size2);
+  border-color: var(--jp-input-border-color);
+  border-style: solid;
+  border-radius: var(--jp-border-radius);
+  border-width: 1px;
+  padding: 6px 8px;
+  background: none;
+  color: var(--jp-ui-font-color0);
+  height: inherit;
+}
+
+.jp-sqlcell-toolbar-widget {
   display: flex;
   border: solid 1px;
   align-items: center;
 }
 
-.jp-sqlcell-widget[aria-disabled='true'] span:first-child {
-  color: var(--jp-ui-font-color3);
+.jp-sqlcell-widget {
+  display: flex;
 }
 
-.jp-sqlcell-widget .switch {
+.jp-sqlcell-toolbar-widget .jp-sqlcell-widget > span {
+  display: none;
+}
+
+.jp-sqlcell-toolbar-widget .jp-sqlcell-widget {
+  align-items: center;
+}
+
+.jp-sqlcell-switch {
   display: flex;
-  justify-content: center;
-  align-content: center;
-  flex-wrap: wrap;
   height: 100%;
+  padding-left: 3px;
 }
 
 /* Hide default HTML checkbox */
-.jp-sqlcell-widget .switch input {
+.jp-sqlcell-switch input {
   opacity: 0;
   width: 0;
   height: 0;
 }
 
 /* The slider */
-.jp-sqlcell-widget .slider {
+.jp-sqlcell-switch .slider {
   cursor: pointer;
   height: 15px;
   width: 30px;
@@ -84,7 +103,7 @@ ul.jp-sqlcell-column-items {
   border-radius: 15px;
 }
 
-.jp-sqlcell-widget .slider::before {
+.jp-sqlcell-switch .slider::before {
   display: block;
   content: '';
   height: 15px;
@@ -95,27 +114,27 @@ ul.jp-sqlcell-column-items {
   border-radius: 50%;
 }
 
-.jp-sqlcell-widget input:checked + .slider {
+.jp-sqlcell-switch input:checked + .slider {
   background-color: var(--md-blue-500);
 }
 
-.jp-sqlcell-widget input:focus + .slider {
+.jp-sqlcell-switch input:focus + .slider {
   box-shadow: 0 0 1px var(--md-blue-500);
 }
 
-.jp-sqlcell-widget input:disabled + .slider {
+.jp-sqlcell-switch input:disabled + .slider {
   background-color: var(--jp-layout-color2);
   cursor: not-allowed;
 }
 
-.jp-sqlcell-widget input:checked + .slider::before {
+.jp-sqlcell-switch input:checked + .slider::before {
   -webkit-transform: translateX(15px);
   -ms-transform: translateX(15px);
   transform: translateX(15px);
 }
 
 /* stylelint-disable-next-line selector-class-pattern */
-.jp-sqlcell-widget .jp-ToolbarButtonComponent {
+.jp-sqlcell-toolbar-widget .jp-ToolbarButtonComponent {
   height: 22px;
 }
 

@@ -177,7 +177,7 @@ test.describe('sidebar', () => {
     await title.locator('.lm-AccordionPanel-titleLabel').click();
     expect(await title.getAttribute('aria-expanded')).toBe('true');
     const tables = sidepanel.locator('.jp-sqlcell-table-title');
-    expect(tables).toHaveCount(1);
+    await expect(tables).toHaveCount(1);
     expect(await tables.first().textContent()).toBe('world');
   });
 
