@@ -3,3 +3,33 @@
 
     https://jupyterlab.readthedocs.io/en/stable/developer/css.html
 */
+
+/* SIDE PANEL */
+
+.jp-sqlcell-database-body .lm-mod-hidden {
+  display: none;
+}
+
+ul.jp-sqlcell-table-items {
+  display: block;
+  margin: 0;
+  padding-inline-start: 1em;
+  list-style-type: none;
+}
+
+.jp-sqlcell-table-title {
+  cursor: pointer;
+}
+
+.jp-sqlcell-table-title:hover {
+  background-color: var(--jp-layout-color2);
+}
+
+.jp-sqlcell-table-title > span {
+  vertical-align: middle;
+}
+
+ul.jp-sqlcell-column-items {
+  padding-inline-start: 2em;
+  list-style-type: disc;
+}
