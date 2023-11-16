@@ -15,7 +15,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
   description: 'A JupyterLab extension to run SQL in notebook dedicated cells',
   autoStart: true,
   optional: [ISettingRegistry],
-  activate: (app: JupyterFrontEnd, settingRegistry: ISettingRegistry | null) => {
+  activate: (
+    app: JupyterFrontEnd,
+    settingRegistry: ISettingRegistry | null
+  ) => {
     console.log('JupyterLab extension @jupyter/sql-cell is activated!');
 
     if (settingRegistry) {
@@ -25,7 +28,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
           console.log('@jupyter/sql-cell settings loaded:', settings.composite);
         })
         .catch(reason => {
-          console.error('Failed to load settings for @jupyter/sql-cell.', reason);
+          console.error(
+            'Failed to load settings for @jupyter/sql-cell.',
+            reason
+          );
         });
     }
 
