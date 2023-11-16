@@ -28,6 +28,7 @@ class Database(TypedDict):
 
 
 class DatabaseSummary(DatabaseDesc):
+    alias: str
     id: int
     is_async: bool
 
@@ -149,7 +150,7 @@ class SQLConnector:
             if url.port:
                 summary["port"] = url.port
             summary_databases.append(summary)
-        return summary_databases
+        return sorted(summary_databases, key=lambda d: d['alias'].upper())
 
     @staticmethod
     def to_list(cursor: CursorResult[Any]) -> List[Dict]:

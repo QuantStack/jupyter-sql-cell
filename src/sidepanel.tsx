@@ -11,7 +11,8 @@ import {
   deleteIcon,
   tableRowsIcon
 } from '@jupyterlab/ui-components';
-import { Signal } from '@lumino/signaling';
+import { Token } from '@lumino/coreutils';
+import { ISignal, Signal } from '@lumino/signaling';
 import { AccordionPanel, Panel } from '@lumino/widgets';
 import * as React from 'react';
 
@@ -56,9 +57,31 @@ const databaseIcon = new LabIcon({
 });
 
 /**
+ * The databases side panel token.
+ */
+export const IDatabasesPanel = new Token<IDatabasesPanel>(
+  '@jupyter/sql-cell:databases-list',
+  'The databases side panel.'
+);
+
+/**
+ * The Databases interface.
+ */
+export interface IDatabasesPanel {
+  /**
+   * The databases list.
+   */
+  readonly databases: Databases.IDatabase[];
+  /**
+   * A signal emitting when the databases are updated.
+   */
+  readonly databaseUpdated: ISignal<this, Databases.IDatabase[]>;
+}
+
+/**
  * The side panel containing the list of the databases.
  */
-export class Databases extends SidePanel {
+export class Databases extends SidePanel implements IDatabasesPanel {
   /**
    * Constructor of the databases list.
    */
@@ -71,6 +94,7 @@ export class Databases extends SidePanel {
 
     requestAPI<any>('databases')
       .then(data => {
+        this._databases = data;
         this._buildDatabaseSections(data);
       })
       .catch(reason => {
@@ -79,6 +103,16 @@ export class Databases extends SidePanel {
 
     const content = this.content as AccordionPanel;
     content.expansionToggled.connect(this._onExpansionToogled, this);
+  }
+
+  get databases(): Databases.IDatabase[] {
+    return this._databases;
+  }
+  /**
+   * A signal emitting when the databases are updated.
+   */
+  get databaseUpdated(): ISignal<this, Databases.IDatabase[]> {
+    return this._databasesUpdated;
   }
 
   /**
@@ -104,6 +138,9 @@ export class Databases extends SidePanel {
       section.onExpand();
     }
   }
+
+  private _databasesUpdated = new Signal<this, Databases.IDatabase[]>(this);
+  private _databases: Databases.IDatabase[] = [];
 }
 
 /**

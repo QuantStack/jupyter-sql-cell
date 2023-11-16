@@ -2055,14 +2055,20 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@jupyter/sql-cell@workspace:."
   dependencies:
+    "@jupyter/ydoc": ^1.0.0
     "@jupyterlab/application": ^4.0.0
     "@jupyterlab/builder": ^4.0.0
+    "@jupyterlab/cells": ^4.0.0
+    "@jupyterlab/codeeditor": ^4.0.0
     "@jupyterlab/coreutils": ^6.0.0
+    "@jupyterlab/notebook": ^4.0.0
     "@jupyterlab/services": ^7.0.0
     "@jupyterlab/settingregistry": ^4.0.0
     "@jupyterlab/testutils": ^4.0.0
     "@jupyterlab/translation": ^4.0.0
     "@jupyterlab/ui-components": ^4.0.0
+    "@lumino/coreutils": ^2.0.0
+    "@lumino/messaging": ^2.0.0
     "@lumino/signaling": ^2.0.0
     "@lumino/widgets": ^2.0.0
     "@types/jest": ^29.2.0
@@ -2093,7 +2099,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@jupyter/ydoc@npm:^1.0.2":
+"@jupyter/ydoc@npm:^1.0.0, @jupyter/ydoc@npm:^1.0.2":
   version: 1.1.1
   resolution: "@jupyter/ydoc@npm:1.1.1"
   dependencies:
@@ -2219,7 +2225,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyterlab/cells@npm:^4.0.8":
+"@jupyterlab/cells@npm:^4.0.0, @jupyterlab/cells@npm:^4.0.8":
   version: 4.0.8
   resolution: "@jupyterlab/cells@npm:4.0.8"
   dependencies:
@@ -2255,7 +2261,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyterlab/codeeditor@npm:^4.0.8":
+"@jupyterlab/codeeditor@npm:^4.0.0, @jupyterlab/codeeditor@npm:^4.0.8":
   version: 4.0.8
   resolution: "@jupyterlab/codeeditor@npm:4.0.8"
   dependencies:
@@ -2458,7 +2464,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyterlab/notebook@npm:^4.0.8":
+"@jupyterlab/notebook@npm:^4.0.0, @jupyterlab/notebook@npm:^4.0.8":
   version: 4.0.8
   resolution: "@jupyterlab/notebook@npm:4.0.8"
   dependencies:
@@ -2917,7 +2923,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@lumino/coreutils@npm:^1.11.0 || ^2.0.0, @lumino/coreutils@npm:^1.11.0 || ^2.1.2, @lumino/coreutils@npm:^2.1.2":
+"@lumino/coreutils@npm:^1.11.0 || ^2.0.0, @lumino/coreutils@npm:^1.11.0 || ^2.1.2, @lumino/coreutils@npm:^2.0.0, @lumino/coreutils@npm:^2.1.2":
   version: 2.1.2
   resolution: "@lumino/coreutils@npm:2.1.2"
   checksum: 7865317ac0676b448d108eb57ab5d8b2a17c101995c0f7a7106662d9fe6c859570104525f83ee3cda12ae2e326803372206d6f4c1f415a5b59e4158a7b81066f
@@ -2957,7 +2963,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@lumino/messaging@npm:^2.0.1":
+"@lumino/messaging@npm:^2.0.0, @lumino/messaging@npm:^2.0.1":
   version: 2.0.1
   resolution: "@lumino/messaging@npm:2.0.1"
   dependencies:
