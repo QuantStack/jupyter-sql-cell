@@ -1,5 +1,4 @@
 import {
-  ILabShell,
   ILayoutRestorer,
   JupyterFrontEnd,
   JupyterFrontEndPlugin
@@ -8,7 +7,6 @@ import {
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 
-import { requestAPI } from './handler';
 import { Databases } from './sidepanel';
 
 /**
@@ -17,19 +15,19 @@ import { Databases } from './sidepanel';
 const namespace = 'sql-cell';
 
 /**
- * Initialization data for the @jupyter/sql-cell extension.
+ * The side panel to handle the list of databases.
  */
 const plugin: JupyterFrontEndPlugin<void> = {
   id: '@jupyter/sql-cell:plugin',
-  description: 'A JupyterLab extension to run SQL in notebook dedicated cells',
+  description: 'The side panel which handle databases list.',
   autoStart: true,
-  optional: [ISettingRegistry],
+  optional: [ILayoutRestorer, ISettingRegistry, ITranslator],
   activate: (
     app: JupyterFrontEnd,
-    settingRegistry: ISettingRegistry | null
+    restorer: ILayoutRestorer | null,
+    settingRegistry: ISettingRegistry | null,
+    translator: ITranslator | null
   ) => {
-    console.log('JupyterLab extension @jupyter/sql-cell is activated!');
-
     if (settingRegistry) {
       settingRegistry
         .load(plugin.id)
@@ -44,32 +42,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
         });
     }
 
-    requestAPI<any>('get-example')
-      .then(data => {
-        console.log(data);
-      })
-      .catch(reason => {
-        console.error(
-          `The jupyter_sql_cell server extension appears to be missing.\n${reason}`
-        );
-      });
-  }
-};
-
-/**
- * The side panel to handle the list of databases.
- */
-const databasesPanel: JupyterFrontEndPlugin<void> = {
-  id: '@jupyter/sql-cell:databases-panel',
-  description: 'The side panel which handle databases list.',
-  autoStart: true,
-  optional: [ILabShell, ILayoutRestorer, ITranslator],
-  activate: (
-    app: JupyterFrontEnd,
-    labShell: ILabShell,
-    restorer: ILayoutRestorer | null,
-    translator: ITranslator | null
-  ) => {
     const { shell } = app;
     if (!translator) {
       translator = nullTranslator;
@@ -85,4 +57,4 @@ const databasesPanel: JupyterFrontEndPlugin<void> = {
   }
 };
 
-export default [plugin, databasesPanel];
+export default [plugin];

@@ -1,7 +1,6 @@
 import json
-
-from jupyter_server.base.handlers import APIHandler
 import tornado
+from jupyter_server.base.handlers import APIHandler
 
 from .sqlconnector import SQLConnector
 
@@ -103,14 +102,3 @@ class DatabaseSchemaHandler(APIHandler):
         except Exception as e:
             self.log.error(f"Query error\n{e}")
             self.write_error(500, exec_info=e)
-
-
-class ExampleHandler(APIHandler):
-    # The following decorator should be present on all verb methods (head, get, post,
-    # patch, put, delete, options) to ensure only authorized user can request the
-    # Jupyter server
-    @tornado.web.authenticated
-    def get(self):
-        self.finish(json.dumps({
-            "data": "This is /jupyter-sql-cell/get-example endpoint!"
-        }))

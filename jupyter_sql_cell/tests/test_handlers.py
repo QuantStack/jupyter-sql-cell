@@ -3,18 +3,6 @@ import json
 from tornado.httpclient import HTTPClientError
 
 
-async def test_get_example(jp_fetch):
-    # When
-    response = await jp_fetch("jupyter-sql-cell", "get-example")
-
-    # Then
-    assert response.code == 200
-    payload = json.loads(response.body)
-    assert payload == {
-        "data": "This is /jupyter-sql-cell/get-example endpoint!"
-    }
-
-
 """
 Should load and query the default database when none has been provided in config.
 """
