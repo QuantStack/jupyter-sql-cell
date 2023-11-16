@@ -1,8 +1,4 @@
-import {
-  IJupyterLabPageFixture,
-  expect,
-  test
-} from '@jupyterlab/galata';
+import { IJupyterLabPageFixture, expect, test } from '@jupyterlab/galata';
 import { Locator } from '@playwright/test';
 
 async function openSidePanel(page: IJupyterLabPageFixture): Promise<Locator> {
