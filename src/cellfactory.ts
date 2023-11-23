@@ -156,6 +156,7 @@ export class CellHeader extends Widget implements ICellHeader {
   private _checkSource() {
     if (!this._kernelInjection.status) {
       this._setCellSql(false);
+      return;
     }
     const sourceStart = this._cellModel?.sharedModel.source.substring(0, 5);
     if (sourceStart === MAGIC && !this._isSQL) {
