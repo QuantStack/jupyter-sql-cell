@@ -36,6 +36,7 @@ ul.jp-sqlcell-column-items {
 
 /* TOOLBAR */
 
+/* stylelint-disable-next-line selector-class-pattern */
 .jp-sqlcell-header .jp-Toolbar {
   border-bottom: none;
 }
