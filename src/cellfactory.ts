@@ -5,6 +5,7 @@ import { ReactWidget, ReactiveToolbar } from '@jupyterlab/ui-components';
 import { Message } from '@lumino/messaging';
 import { SingletonLayout, Widget } from '@lumino/widgets';
 
+import { MAGIC } from './common';
 import { IDatabasesPanel } from './sidepanel';
 import { DatabaseSelect } from './widgets';
 
@@ -12,11 +13,6 @@ import { DatabaseSelect } from './widgets';
  * The class of the header.
  */
 const HEADER_CLASS = 'jp-sqlcell-header';
-
-/**
- * The expected magic.
- */
-const MAGIC = '%%sql';
 
 /**
  * The notebook content factory.

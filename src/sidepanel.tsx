@@ -69,6 +69,10 @@ export const IDatabasesPanel = new Token<IDatabasesPanel>(
  */
 export interface IDatabasesPanel {
   /**
+   * Get a database from its alias.
+   */
+  get_database(alias: string): Databases.IDatabase | undefined;
+  /**
    * The databases list.
    */
   readonly databases: Databases.IDatabase[];
@@ -105,9 +109,19 @@ export class Databases extends SidePanel implements IDatabasesPanel {
     content.expansionToggled.connect(this._onExpansionToogled, this);
   }
 
+  /**
+   * Get a database from its alias.
+   */
+  get_database(alias: string): Databases.IDatabase | undefined {
+    return this._databases.find(db => db.alias === alias);
+  }
+  /**
+   * Get the databases list.
+   */
   get databases(): Databases.IDatabase[] {
     return this._databases;
   }
+
   /**
    * A signal emitting when the databases are updated.
    */
@@ -146,7 +160,7 @@ export class Databases extends SidePanel implements IDatabasesPanel {
 /**
  * Namespace for the databases side panel.
  */
-namespace Databases {
+export namespace Databases {
   /**
    * Options of the databases side panel's constructor.
    */
