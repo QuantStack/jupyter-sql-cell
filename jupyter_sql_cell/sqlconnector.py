@@ -34,17 +34,19 @@ class SQLConnector:
     def __init__(self, database_id: int):
         self.engine = None
         self.errors = []
+        self.is_async = False
         self.database: Database = next(filter(lambda db: db["id"] == database_id, self.databases), None)
         if not self.database:
             self.errors.append(f"There is no registered database with id {database_id}")
         else:
-            if self.database["is_async"]:
+            self.is_async = self.database["is_async"]
+            if self.is_async:
                 self.engine = create_async_engine(self.database["url"])
             else:
                 self.engine = create_engine(self.database["url"])
 
     async def get_schema(self, target: str, table: str = "") -> [str]:
-        if self.database["is_async"]:
+        if self.is_async:
             async with self.engine.connect() as conn:
                 schema = await conn.run_sync(self.use_inspector, target, table)
         else:
@@ -63,11 +65,18 @@ class SQLConnector:
     async def execute(self, query: str) -> str:
         if not self.engine:
             return "SQL engine has not been created"
-        cursor: CursorResult[Any] = await self.execute_request(query)
+        if self.is_async:
+            cursor: CursorResult[Any] = await self.execute_request_async(query)
+        else:
+            cursor: CursorResult[Any] = self.execute_request(query)
 
         return self.to_list(cursor)
 
-    async def execute_request(self, query: str) -> CursorResult[Any]:
+    def execute_request(self, query: str) -> CursorResult[Any]:
+        with self.engine.connect() as connection:
+            return connection.execute(text(query))
+
+    async def execute_request_async(self, query: str) -> CursorResult[Any]:
         async with self.engine.connect() as connection:
             cursor: CursorResult[Any] = await connection.execute(text(query))
             return cursor
@@ -125,8 +134,6 @@ class SQLConnector:
             "url": url,
             "is_async": False
         })
-        cls.warnings.append("No async driver found, the query will be executed synchronously")
-        print(cls.warnings[-1])
 
     @classmethod
     def get_databases(cls):
