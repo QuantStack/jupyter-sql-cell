@@ -3,13 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 from sqlalchemy import CursorResult, Inspector, URL, create_engine, inspect, text
 from typing import Any, Dict, List, Optional, TypedDict
 
-ASYNC_DRIVERS = {
-    "mariadb": ["asyncmy", "aiomysql"],
-    "mysql": ["asyncmy", "aiomysql"],
-    "postgres": ["asyncpg", "psycopg"],
-    "sqlite": ["aiosqlite"],
-}
-
 
 class DatabaseDesc(TypedDict):
     alias: Optional[str]
@@ -90,14 +83,10 @@ class SQLConnector:
         else:
             alias = f"{db_desc['dbms']}_{id}"
 
+        # If the driver is filled, test if it is async.
         if db_desc["driver"]:
-            drivers = [db_desc["driver"]]
-        else:
-            drivers = ASYNC_DRIVERS.get(db_desc["dbms"], [])
-
-        for driver in drivers:
             url = URL.create(
-                drivername=f"{db_desc['dbms']}+{driver}",
+                drivername=f"{db_desc['dbms']}+{db_desc['driver']}",
                 host=db_desc["host"],
                 port=db_desc["port"],
                 database=db_desc["database"]
@@ -111,11 +100,17 @@ class SQLConnector:
                     "is_async": True
                 })
                 return
-            except (InvalidRequestError, NoSuchModuleError):
-                # InvalidRequestError is raised if the driver is not async.
+            except NoSuchModuleError:
                 # NoSuchModuleError is raised if the driver is not installed.
-                continue
+                raise Exception(
+                    f"The database's driver \"{db_desc['driver']}\" is not installed."
+                )
+            except InvalidRequestError:
+                # InvalidRequestError is raised if the driver is not async.
+                # Let's try this driver as synchronous.
+                pass
 
+        # If the driver is not async or not filled, use the default sync engine.
         driver = f"+{db_desc['driver']}" if db_desc["driver"] else ""
         url = URL.create(
             drivername=f"{db_desc['dbms']}{driver}",
