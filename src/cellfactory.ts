@@ -8,6 +8,7 @@ import { SingletonLayout, Widget } from '@lumino/widgets';
 import { MAGIC } from './common';
 import { IDatabasesPanel } from './sidepanel';
 import { DatabaseSelect } from './widgets';
+import { IKernelInjection } from './kernelInjection';
 
 /**
  * The class of the header.
@@ -24,6 +25,7 @@ export class NotebookContentFactory
   constructor(options: ContentFactory.IOptions) {
     super(options);
     this._databasesPanel = options.databasesPanel;
+    this._kernelInjection = options.kernelInjection;
   }
 
   /**
@@ -39,9 +41,11 @@ export class NotebookContentFactory
   createCodeCell(options: CodeCell.IOptions): CodeCell {
     const editorFactory = options.contentFactory.editorFactory;
     const databasesPanel = this._databasesPanel;
+    const kernelInjection = this._kernelInjection;
     const cellContentFactory = new CellContentFactory({
       databasesPanel,
-      editorFactory
+      editorFactory,
+      kernelInjection
     });
     const cell = new CodeCell({
       ...options,
@@ -51,6 +55,7 @@ export class NotebookContentFactory
   }
 
   private _databasesPanel: IDatabasesPanel;
+  private _kernelInjection: IKernelInjection;
 }
 
 /**
@@ -66,6 +71,7 @@ export class CellContentFactory
   constructor(options: ContentFactory.IOptions) {
     super(options);
     this._databasesPanel = options.databasesPanel;
+    this._kernelInjection = options.kernelInjection;
   }
 
   /**
@@ -73,10 +79,12 @@ export class CellContentFactory
    */
   createCellHeader(): ICellHeader {
     const databasesPanel = this._databasesPanel;
-    return new CellHeader({ databasesPanel });
+    const kernelInjection = this._kernelInjection;
+    return new CellHeader({ databasesPanel, kernelInjection });
   }
 
   private _databasesPanel: IDatabasesPanel;
+  private _kernelInjection: IKernelInjection;
 }
 
 /**
@@ -86,12 +94,19 @@ export class CellHeader extends Widget implements ICellHeader {
   /**
    * Creates a cell header.
    */
-  constructor(options: { databasesPanel: IDatabasesPanel }) {
+  constructor(options: {
+    databasesPanel: IDatabasesPanel;
+    kernelInjection: IKernelInjection;
+  }) {
     super();
     this.layout = new SingletonLayout();
     this._databasesPanel = options.databasesPanel;
-
+    this._kernelInjection = options.kernelInjection;
     this._toolbar = new ReactiveToolbar();
+
+    this._kernelInjection.statusChanged.connect(() => {
+      this._checkSource();
+    }, this);
   }
 
   /**
@@ -118,16 +133,16 @@ export class CellHeader extends Widget implements ICellHeader {
   }
 
   /**
-   * Check the source of the cell for the MAGIC command, and attach or detach
-   * the toolbar if necessary.
+   * Set the cell as SQL or not, and displaying the toolbar header.
+   *
+   * @param status - boolean, whether the cell is SQL or not.
    */
-  private _checkSource() {
-    const sourceStart = this._cellModel?.sharedModel.source.substring(0, 5);
-    if (sourceStart === MAGIC && !this._isSQL) {
+  private _setCellSql(status: boolean) {
+    if (status) {
       this._isSQL = true;
       this.addClass(HEADER_CLASS);
       (this.layout as SingletonLayout).widget = this._toolbar;
-    } else if (sourceStart !== MAGIC && this._isSQL) {
+    } else {
       this._isSQL = false;
       this.removeClass(HEADER_CLASS);
       (this.layout as SingletonLayout).removeWidget(this._toolbar);
@@ -135,10 +150,26 @@ export class CellHeader extends Widget implements ICellHeader {
   }
 
   /**
+   * Check the source of the cell for the MAGIC command, and attach or detach
+   * the toolbar if necessary.
+   */
+  private _checkSource() {
+    if (!this._kernelInjection.status) {
+      this._setCellSql(false);
+    }
+    const sourceStart = this._cellModel?.sharedModel.source.substring(0, 5);
+    if (sourceStart === MAGIC && !this._isSQL) {
+      this._setCellSql(true);
+    } else if (sourceStart !== MAGIC && this._isSQL) {
+      this._setCellSql(false);
+    }
+  }
+
+  /**
    * Triggered when the shared model change.
    */
   private _onSharedModelChanged = (_: ISharedCodeCell, change: CellChange) => {
-    if (change.sourceChange) {
+    if (this._kernelInjection.status && change.sourceChange) {
       this._checkSource();
     }
   };
@@ -155,6 +186,11 @@ export class CellHeader extends Widget implements ICellHeader {
    */
   protected onBeforeDetach(msg: Message): void {
     (this.layout as SingletonLayout).removeWidget(this._toolbar);
+
+    this._kernelInjection.statusChanged.disconnect((_, status) => {
+      this._checkSource();
+    }, this);
+
     this._cellModel?.sharedModel.changed.disconnect(
       this._onSharedModelChanged,
       this
@@ -162,6 +198,7 @@ export class CellHeader extends Widget implements ICellHeader {
   }
 
   private _databasesPanel: IDatabasesPanel;
+  private _kernelInjection: IKernelInjection;
   private _cellModel: ICodeCellModel | null = null;
   private _isSQL = false;
   private _toolbar: ReactiveToolbar;
@@ -179,5 +216,9 @@ export namespace ContentFactory {
      * The databases panel, containing the known databases.
      */
     databasesPanel: IDatabasesPanel;
+    /**
+     * The kernel injection, whether the kernel can handle sql magics or not.
+     */
+    kernelInjection: IKernelInjection;
   }
 }
