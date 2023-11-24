@@ -3,13 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 from sqlalchemy import CursorResult, Inspector, URL, create_engine, inspect, text
 from typing import Any, Dict, List, Optional, TypedDict
 
-ASYNC_DRIVERS = {
-    "mariadb": ["asyncmy", "aiomysql"],
-    "mysql": ["asyncmy", "aiomysql"],
-    "postgres": ["asyncpg", "psycopg"],
-    "sqlite": ["aiosqlite"],
-}
-
 
 class DatabaseDesc(TypedDict):
     alias: Optional[str]
@@ -28,6 +21,7 @@ class Database(TypedDict):
 
 
 class DatabaseSummary(DatabaseDesc):
+    alias: str
     id: int
     is_async: bool
 
@@ -40,17 +34,19 @@ class SQLConnector:
     def __init__(self, database_id: int):
         self.engine = None
         self.errors = []
+        self.is_async = False
         self.database: Database = next(filter(lambda db: db["id"] == database_id, self.databases), None)
         if not self.database:
             self.errors.append(f"There is no registered database with id {database_id}")
         else:
-            if self.database["is_async"]:
+            self.is_async = self.database["is_async"]
+            if self.is_async:
                 self.engine = create_async_engine(self.database["url"])
             else:
                 self.engine = create_engine(self.database["url"])
 
     async def get_schema(self, target: str, table: str = "") -> [str]:
-        if self.database["is_async"]:
+        if self.is_async:
             async with self.engine.connect() as conn:
                 schema = await conn.run_sync(self.use_inspector, target, table)
         else:
@@ -69,11 +65,18 @@ class SQLConnector:
     async def execute(self, query: str) -> str:
         if not self.engine:
             return "SQL engine has not been created"
-        cursor: CursorResult[Any] = await self.execute_request(query)
+        if self.is_async:
+            cursor: CursorResult[Any] = await self.execute_request_async(query)
+        else:
+            cursor: CursorResult[Any] = self.execute_request(query)
 
         return self.to_list(cursor)
 
-    async def execute_request(self, query: str) -> CursorResult[Any]:
+    def execute_request(self, query: str) -> CursorResult[Any]:
+        with self.engine.connect() as connection:
+            return connection.execute(text(query))
+
+    async def execute_request_async(self, query: str) -> CursorResult[Any]:
         async with self.engine.connect() as connection:
             cursor: CursorResult[Any] = await connection.execute(text(query))
             return cursor
@@ -89,14 +92,10 @@ class SQLConnector:
         else:
             alias = f"{db_desc['dbms']}_{id}"
 
+        # If the driver is filled, test if it is async.
         if db_desc["driver"]:
-            drivers = [db_desc["driver"]]
-        else:
-            drivers = ASYNC_DRIVERS.get(db_desc["dbms"], [])
-
-        for driver in drivers:
             url = URL.create(
-                drivername=f"{db_desc['dbms']}+{driver}",
+                drivername=f"{db_desc['dbms']}+{db_desc['driver']}",
                 host=db_desc["host"],
                 port=db_desc["port"],
                 database=db_desc["database"]
@@ -110,11 +109,17 @@ class SQLConnector:
                     "is_async": True
                 })
                 return
-            except (InvalidRequestError, NoSuchModuleError):
-                # InvalidRequestError is raised if the driver is not async.
+            except NoSuchModuleError:
                 # NoSuchModuleError is raised if the driver is not installed.
-                continue
+                raise Exception(
+                    f"The database's driver \"{db_desc['driver']}\" is not installed."
+                )
+            except InvalidRequestError:
+                # InvalidRequestError is raised if the driver is not async.
+                # Let's try this driver as synchronous.
+                pass
 
+        # If the driver is not async or not filled, use the default sync engine.
         driver = f"+{db_desc['driver']}" if db_desc["driver"] else ""
         url = URL.create(
             drivername=f"{db_desc['dbms']}{driver}",
@@ -129,8 +134,6 @@ class SQLConnector:
             "url": url,
             "is_async": False
         })
-        cls.warnings.append("No async driver found, the query will be executed synchronously")
-        print(cls.warnings[-1])
 
     @classmethod
     def get_databases(cls):
@@ -149,7 +152,7 @@ class SQLConnector:
             if url.port:
                 summary["port"] = url.port
             summary_databases.append(summary)
-        return summary_databases
+        return sorted(summary_databases, key=lambda d: d['alias'].upper())
 
     @staticmethod
     def to_list(cursor: CursorResult[Any]) -> List[Dict]:

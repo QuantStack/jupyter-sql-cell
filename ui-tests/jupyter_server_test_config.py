@@ -23,7 +23,7 @@ for file in os.listdir(test_db_path):
   databases.append({
     "database":str(test_db_path / file),
     "dbms":"sqlite",
-    "driver":"aiosqlite",
+    "driver":"pysqlite",
     "alias":file_path.stem
   })
 

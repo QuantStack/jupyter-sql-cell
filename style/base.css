@@ -33,3 +33,10 @@ ul.jp-sqlcell-column-items {
   padding-inline-start: 2em;
   list-style-type: disc;
 }
+
+/* TOOLBAR */
+
+/* stylelint-disable-next-line selector-class-pattern */
+.jp-sqlcell-header .jp-Toolbar {
+  border-bottom: none;
+}

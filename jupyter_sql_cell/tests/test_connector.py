@@ -48,11 +48,10 @@ async def test_sql_connector_init():
 
 
 """
-Should add an async database.
+Should add a default driver.
 """
 async def test_sql_connector_without_driver(add_database):
     assert len(SQLConnector.databases) == 1
-    assert len(SQLConnector.warnings) == 0
     connector = SQLConnector(0)
     assert len(connector.errors) == 0
 
@@ -62,7 +61,6 @@ Should add a sync database.
 """
 async def test_sql_connector_with_sync_driver(add_sync_database):
     assert len(SQLConnector.databases) == 1
-    assert len(SQLConnector.warnings) == 1
     connector = SQLConnector(0)
     assert len(connector.errors) == 0
 
