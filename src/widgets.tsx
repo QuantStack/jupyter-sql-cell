@@ -2,7 +2,8 @@ import { ICellModel } from '@jupyterlab/cells';
 import * as React from 'react';
 
 import { MAGIC } from './common';
-import { Databases, IDatabasesPanel } from './sidepanel';
+import { Database } from './databases';
+import { IDatabasesPanel } from './sidepanel';
 
 /**
  * A field including a select to associate a database.
@@ -49,13 +50,10 @@ namespace Private {
    */
   export function changeDatabase(
     cellModel: ICellModel,
-    database: Databases.IDatabase
+    database: Database
   ): void {
     let magicLine = MAGIC;
-    magicLine += ` ${database.driver}`;
-    magicLine += '://';
-    magicLine += `/${database.database}`;
-    magicLine += database.port ? `:${database.port}` : '';
+    magicLine += ` ${database.url}`;
 
     const source = cellModel.sharedModel.source;
     const sourceArray = source.split('\n');

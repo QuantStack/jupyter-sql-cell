@@ -13,7 +13,7 @@ import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 import { NotebookContentFactory } from './cellfactory';
 import { LOAD_MAGIC } from './common';
 import { IKernelInjection, KernelInjection } from './kernelInjection';
-import { Databases, IDatabasesPanel } from './sidepanel';
+import { DatabasesPanel, IDatabasesPanel } from './sidepanel';
 
 /**
  * The sql-cell namespace token.
@@ -53,7 +53,7 @@ const plugin: JupyterFrontEndPlugin<IDatabasesPanel> = {
     if (!translator) {
       translator = nullTranslator;
     }
-    const panel = new Databases({ translator });
+    const panel = new DatabasesPanel({ translator });
 
     // Restore the widget state
     if (restorer) {
