@@ -136,7 +136,10 @@ const kernelInjector: JupyterFrontEndPlugin<void> = {
       if (kernel) {
         kernel.info.then(info => {
           const code = LOAD_MAGIC;
-          const content: KernelMessage.IExecuteRequestMsg['content'] = { code };
+          const content: KernelMessage.IExecuteRequestMsg['content'] = {
+            code,
+            store_history: false
+          };
           const future = kernel.requestExecute(content);
           future.done.then(reply => {
             kernelInjection.status = reply.content.status === 'ok';
