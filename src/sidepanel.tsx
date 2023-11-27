@@ -16,6 +16,7 @@ import { ISignal, Signal } from '@lumino/signaling';
 import { AccordionPanel, Panel } from '@lumino/widgets';
 import * as React from 'react';
 
+import { Database } from './databases';
 import { requestAPI } from './handler';
 import databaseSvgstr from '../style/icons/database.svg';
 
@@ -71,35 +72,37 @@ export interface IDatabasesPanel {
   /**
    * Get a database from its alias.
    */
-  get_database(alias: string): Databases.IDatabase | undefined;
+  get_database(alias: string): Database | undefined;
   /**
    * The databases list.
    */
-  readonly databases: Databases.IDatabase[];
+  readonly databases: Database[];
   /**
    * A signal emitting when the databases are updated.
    */
-  readonly databaseUpdated: ISignal<this, Databases.IDatabase[]>;
+  readonly databaseUpdated: ISignal<this, Database[]>;
 }
 
 /**
  * The side panel containing the list of the databases.
  */
-export class Databases extends SidePanel implements IDatabasesPanel {
+export class DatabasesPanel extends SidePanel implements IDatabasesPanel {
   /**
    * Constructor of the databases list.
    */
-  constructor(options: Databases.IOptions) {
+  constructor(options: DatabasesPanel.IOptions) {
     super({ translator: options.translator });
     this.id = 'jp-sql-cell-sidebar';
     this.addClass(DATABASES_CLASS);
     this.title.icon = databaseIcon;
     this.title.caption = 'Databases';
 
-    requestAPI<any>('databases')
+    requestAPI<Database.Description[]>('databases')
       .then(data => {
-        this._databases = data;
-        this._buildDatabaseSections(data);
+        data.forEach(database => {
+          this._databases.push(new Database({ database }));
+        });
+        this._buildDatabaseSections(this._databases);
       })
       .catch(reason => {
         console.error(reason);
@@ -112,20 +115,20 @@ export class Databases extends SidePanel implements IDatabasesPanel {
   /**
    * Get a database from its alias.
    */
-  get_database(alias: string): Databases.IDatabase | undefined {
+  get_database(alias: string): Database | undefined {
     return this._databases.find(db => db.alias === alias);
   }
   /**
    * Get the databases list.
    */
-  get databases(): Databases.IDatabase[] {
+  get databases(): Database[] {
     return this._databases;
   }
 
   /**
    * A signal emitting when the databases are updated.
    */
-  get databaseUpdated(): ISignal<this, Databases.IDatabase[]> {
+  get databaseUpdated(): ISignal<this, Database[]> {
     return this._databasesUpdated;
   }
 
@@ -135,7 +138,7 @@ export class Databases extends SidePanel implements IDatabasesPanel {
    * @param databases - the databases description.
    * @param tracker - the notebook tracker.
    */
-  private _buildDatabaseSections(databases: Databases.IDatabase[]) {
+  private _buildDatabaseSections(databases: Database[]) {
     const content = this.content as AccordionPanel;
     databases.forEach(database => {
       this.addWidget(new DatabaseSection({ database }));
@@ -153,14 +156,14 @@ export class Databases extends SidePanel implements IDatabasesPanel {
     }
   }
 
-  private _databasesUpdated = new Signal<this, Databases.IDatabase[]>(this);
-  private _databases: Databases.IDatabase[] = [];
+  private _databasesUpdated = new Signal<this, Database[]>(this);
+  private _databases: Database[] = [];
 }
 
 /**
  * Namespace for the databases side panel.
  */
-export namespace Databases {
+export namespace DatabasesPanel {
   /**
    * Options of the databases side panel's constructor.
    */
@@ -169,19 +172,6 @@ export namespace Databases {
      * The translator.
      */
     translator: ITranslator;
-  }
-
-  /**
-   * Database object returned from server request.
-   */
-  export interface IDatabase {
-    alias: string;
-    database: string;
-    driver: string;
-    id: number;
-    is_async: boolean;
-    host?: string;
-    port?: number;
   }
 }
 
@@ -194,7 +184,7 @@ class DatabaseSection extends PanelWithToolbar {
     this._database = options.database;
     this.addClass(DATABASE_CLASS);
     this.title.label = this._database.alias;
-    this.title.caption = this._tooltip();
+    this.title.caption = this._database.text();
     this.toolbar.addClass(TOOLBAR_CLASS);
 
     const deleteButton = new ToolbarButton({
@@ -231,19 +221,7 @@ class DatabaseSection extends PanelWithToolbar {
     }
   }
 
-  /**
-   * Build the tooltip text of the toolbar.
-   */
-  private _tooltip() {
-    let tooltip = '';
-    let key: keyof Databases.IDatabase;
-    for (key in this._database) {
-      tooltip = tooltip + `${key}: ${this._database[key]?.toString()}\n`;
-    }
-    return tooltip;
-  }
-
-  private _database: Databases.IDatabase;
+  private _database: Database;
   private _body: TablesList;
   private _tables: string[] = [];
 }
@@ -259,7 +237,7 @@ namespace DatabaseSection {
     /**
      * The database description.
      */
-    database: Databases.IDatabase;
+    database: Database;
   }
 
   /**
