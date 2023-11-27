@@ -1,7 +1,7 @@
 import { CellChange, ISharedCodeCell } from '@jupyter/ydoc';
 import { Cell, CodeCell, ICellHeader, ICodeCellModel } from '@jupyterlab/cells';
 import { Notebook, NotebookPanel } from '@jupyterlab/notebook';
-import { ReactWidget, ReactiveToolbar } from '@jupyterlab/ui-components';
+import { ReactiveToolbar } from '@jupyterlab/ui-components';
 import { Message } from '@lumino/messaging';
 import { SingletonLayout, Widget } from '@lumino/widgets';
 
@@ -121,12 +121,11 @@ export class CellHeader extends Widget implements ICellHeader {
       this
     );
 
-    const databaseSelect = ReactWidget.create(
-      DatabaseSelect({
-        cellModel: this._cellModel,
-        databasesPanel: this._databasesPanel
-      })
-    );
+    const databaseSelect = new DatabaseSelect({
+      cellModel: this._cellModel,
+      databasesPanel: this._databasesPanel
+    });
+
     this._toolbar.addItem('select', databaseSelect);
 
     this._checkSource();
