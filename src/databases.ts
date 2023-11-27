@@ -10,7 +10,7 @@ export class Database {
   }
 
   /**
-   *
+   * Return alias of the database.
    */
   get alias(): string {
     return this._database.alias;
@@ -25,7 +25,7 @@ export class Database {
    */
   get url(): string {
     let value = '';
-    value += ` ${this._database.driver}`;
+    value += `${this._database.driver}`;
     value += '://';
     value += `/${this._database.database}`;
     value += this._database.port ? `:${this._database.port}` : '';
@@ -41,7 +41,6 @@ export class Database {
     for (key in this._database) {
       value += `${key}: ${this._database[key]?.toString()}\n`;
     }
-    console.log(value);
     return value;
   }
 
