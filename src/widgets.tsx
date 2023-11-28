@@ -12,7 +12,7 @@ import { IDatabasesPanel } from './sidepanel';
  */
 export class DatabaseSelect extends ReactWidget {
   constructor(options: {
-    cellModel: ICellModel | null;
+    cellModel: ICellModel | undefined;
     databasesPanel: IDatabasesPanel;
   }) {
     super();
@@ -63,7 +63,7 @@ export class DatabaseSelect extends ReactWidget {
     );
   }
 
-  private _cellModel: ICellModel | null;
+  private _cellModel: ICellModel | undefined;
   private _databasesPanel: IDatabasesPanel;
 }
 
@@ -72,7 +72,7 @@ export class DatabaseSelect extends ReactWidget {
  */
 namespace Private {
   export function getDatabaseUrl(
-    cellModel: ICellModel | null
+    cellModel: ICellModel | undefined
   ): string | undefined {
     if (!cellModel) {
       return;

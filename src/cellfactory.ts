@@ -1,5 +1,5 @@
 import { CellChange, ISharedCodeCell } from '@jupyter/ydoc';
-import { Cell, CodeCell, ICellHeader, ICodeCellModel } from '@jupyterlab/cells';
+import { Cell, CodeCell, ICellHeader, ICellModel } from '@jupyterlab/cells';
 import { Notebook, NotebookPanel } from '@jupyterlab/notebook';
 import { ReactiveToolbar } from '@jupyterlab/ui-components';
 import { Message } from '@lumino/messaging';
@@ -9,6 +9,7 @@ import { MAGIC } from './common';
 import { IDatabasesPanel } from './sidepanel';
 import { DatabaseSelect } from './widgets';
 import { IKernelInjection } from './kernelInjection';
+import { IChangedArgs } from '@jupyterlab/coreutils';
 
 /**
  * The class of the header.
@@ -47,15 +48,50 @@ export class NotebookContentFactory
       editorFactory,
       kernelInjection
     });
-    const cell = new CodeCell({
+    const cell = new CustomCodeCell({
       ...options,
-      contentFactory: cellContentFactory
+      contentFactory: cellContentFactory,
+      kernelInjection
     }).initializeState();
     return cell;
   }
 
   private _databasesPanel: IDatabasesPanel;
   private _kernelInjection: IKernelInjection;
+}
+
+/**
+ * A custom code cell to copy the output in a variable when the cell is executed.
+ */
+class CustomCodeCell extends CodeCell {
+  constructor(options: CustomCodeCell.IOptions) {
+    super(options);
+    this._kernelInjection = options.kernelInjection;
+  }
+
+  protected onStateChanged(
+    model: ICellModel,
+    args: IChangedArgs<any, any, string>
+  ): void {
+    super.onStateChanged(model, args);
+    if (args.name === 'executionCount' && args.newValue) {
+      this._kernelInjection.copyToKernel(this, 'my_var');
+    }
+  }
+
+  private _kernelInjection: IKernelInjection;
+}
+
+/**
+ * The namespace for custom code cell.
+ */
+namespace CustomCodeCell {
+  export interface IOptions extends CodeCell.IOptions {
+    /**
+     * The kernel injection, whether the kernel can handle sql magics or not.
+     */
+    kernelInjection: IKernelInjection;
+  }
 }
 
 /**
@@ -114,15 +150,15 @@ export class CellHeader extends Widget implements ICellHeader {
    *
    * It adds a listener on the cell content to display or not the toolbar.
    */
-  set cellModel(model: ICodeCellModel | null) {
-    this._cellModel = model;
-    this._cellModel?.sharedModel.changed.connect(
+  set cell(model: CodeCell | null) {
+    this._cell = model;
+    this._cell?.model.sharedModel.changed.connect(
       this._onSharedModelChanged,
       this
     );
 
     const databaseSelect = new DatabaseSelect({
-      cellModel: this._cellModel,
+      cellModel: this._cell?.model,
       databasesPanel: this._databasesPanel
     });
 
@@ -153,11 +189,11 @@ export class CellHeader extends Widget implements ICellHeader {
    * the toolbar if necessary.
    */
   private _checkSource() {
-    if (!this._kernelInjection.status) {
+    if (!this._kernelInjection.getStatus(this._cell)) {
       this._setCellSql(false);
       return;
     }
-    const sourceStart = this._cellModel?.sharedModel.source.substring(0, 5);
+    const sourceStart = this._cell?.model.sharedModel.source.substring(0, 5);
     if (sourceStart === MAGIC && !this._isSQL) {
       this._setCellSql(true);
     } else if (sourceStart !== MAGIC && this._isSQL) {
@@ -169,7 +205,7 @@ export class CellHeader extends Widget implements ICellHeader {
    * Triggered when the shared model change.
    */
   private _onSharedModelChanged = (_: ISharedCodeCell, change: CellChange) => {
-    if (this._kernelInjection.status && change.sourceChange) {
+    if (this._kernelInjection.getStatus(this._cell) && change.sourceChange) {
       this._checkSource();
     }
   };
@@ -178,7 +214,7 @@ export class CellHeader extends Widget implements ICellHeader {
    * Triggered when the widget has been attached.
    */
   protected onAfterAttach(msg: Message): void {
-    this.cellModel = (this.parent as CodeCell).model;
+    this.cell = this.parent as CodeCell;
   }
 
   /**
@@ -191,7 +227,7 @@ export class CellHeader extends Widget implements ICellHeader {
       this._checkSource();
     }, this);
 
-    this._cellModel?.sharedModel.changed.disconnect(
+    this._cell?.model.sharedModel.changed.disconnect(
       this._onSharedModelChanged,
       this
     );
@@ -199,7 +235,7 @@ export class CellHeader extends Widget implements ICellHeader {
 
   private _databasesPanel: IDatabasesPanel;
   private _kernelInjection: IKernelInjection;
-  private _cellModel: ICodeCellModel | null = null;
+  private _cell: CodeCell | null = null;
   private _isSQL = false;
   private _toolbar: ReactiveToolbar;
 }
