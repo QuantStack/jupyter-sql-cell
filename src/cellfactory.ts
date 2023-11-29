@@ -2,14 +2,14 @@ import { CellChange, ISharedCodeCell } from '@jupyter/ydoc';
 import { Cell, CodeCell, ICellHeader, ICellModel } from '@jupyterlab/cells';
 import { IChangedArgs } from '@jupyterlab/coreutils';
 import { Notebook, NotebookPanel } from '@jupyterlab/notebook';
-import { ReactWidget, ReactiveToolbar } from '@jupyterlab/ui-components';
+import { ReactiveToolbar } from '@jupyterlab/ui-components';
 import { Message } from '@lumino/messaging';
 import { SingletonLayout, Widget } from '@lumino/widgets';
 
-import { MAGIC } from './common';
+import { ICustomCodeCell, MAGIC } from './common';
 import { IKernelInjection } from './kernelInjection';
 import { IDatabasesPanel } from './sidepanel';
-import { DatabaseSelect, variableName } from './widgets';
+import { DatabaseSelect, VariableName } from './widgets';
 
 /**
  * The class of the header.
@@ -63,7 +63,7 @@ export class NotebookContentFactory
 /**
  * A custom code cell to copy the output in a variable when the cell is executed.
  */
-class CustomCodeCell extends CodeCell {
+class CustomCodeCell extends CodeCell implements ICustomCodeCell {
   constructor(options: CustomCodeCell.IOptions) {
     super(options);
     this._kernelInjection = options.kernelInjection;
@@ -80,8 +80,11 @@ class CustomCodeCell extends CodeCell {
   }
 
   /**
-   * Set the name of the variable whose copy cell output.
+   * Getter and setter of the name of the variable to copy the cell output to.
    */
+  get variable(): string | null {
+    return this._variable;
+  }
   set variable(name: string | null) {
     this._variable = name;
   }
@@ -110,6 +113,9 @@ class CustomCodeCell extends CodeCell {
  * The namespace for custom code cell.
  */
 namespace CustomCodeCell {
+  /**
+   * The custom code cell options.
+   */
   export interface IOptions extends CodeCell.IOptions {
     /**
      * The kernel injection, whether the kernel can handle sql magics or not.
@@ -174,8 +180,13 @@ export class CellHeader extends Widget implements ICellHeader {
    *
    * It adds a listener on the cell content to display or not the toolbar.
    */
-  set cell(model: CustomCodeCell | null) {
-    this._cell = model;
+  set cell(customCodeCell: CustomCodeCell | null) {
+    this._cell = customCodeCell;
+
+    if (!this._cell) {
+      return;
+    }
+
     this._cell?.model.sharedModel.changed.connect(
       this._onSharedModelChanged,
       this
@@ -187,10 +198,9 @@ export class CellHeader extends Widget implements ICellHeader {
     });
 
     this._toolbar.addItem('select', databaseSelect);
-    this._toolbar.addItem(
-      'variable',
-      ReactWidget.create(variableName(this.setVariable))
-    );
+
+    const variableName = new VariableName({ cell: this._cell });
+    this._toolbar.addItem('variable', variableName);
 
     this._checkSource();
   }

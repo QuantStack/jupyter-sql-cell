@@ -2,7 +2,7 @@ import { ICellModel } from '@jupyterlab/cells';
 import { ReactWidget } from '@jupyterlab/ui-components';
 import React from 'react';
 
-import { MAGIC } from './common';
+import { ICustomCodeCell, MAGIC } from './common';
 import { Database } from './databases';
 import { IDatabasesPanel } from './sidepanel';
 
@@ -39,26 +39,24 @@ export class DatabaseSelect extends ReactWidget {
       }
     });
     return (
-      <div>
-        <label>
-          Database:&nbsp;
-          <select
-            onChange={this.onChange}
-            className={'jp-sqlcell-select'}
-            disabled={this._cellModel?.type !== 'code'}
-          >
-            <option disabled selected={currentDatabase === defaultValue}>
-              {defaultValue}
-            </option>
-            ;
-            {aliases.map(alias => {
-              return (
-                <option selected={currentDatabase === alias}>{alias}</option>
-              );
-            })}
-          </select>
-        </label>
-      </div>
+      <label>
+        Database:&nbsp;
+        <select
+          onChange={this.onChange}
+          className={'jp-sqlcell-select'}
+          disabled={this._cellModel?.type !== 'code'}
+        >
+          <option disabled selected={currentDatabase === defaultValue}>
+            {defaultValue}
+          </option>
+          ;
+          {aliases.map(alias => {
+            return (
+              <option selected={currentDatabase === alias}>{alias}</option>
+            );
+          })}
+        </select>
+      </label>
     );
   }
 
@@ -71,12 +69,31 @@ export class DatabaseSelect extends ReactWidget {
  *
  * @param fn : the callback function.
  */
-export function variableName(fn: (variable: string) => void) {
-  const onChange = (event: React.ChangeEvent) => {
-    fn((event.target as HTMLInputElement).value);
+export class VariableName extends ReactWidget {
+  constructor(options: { cell: ICustomCodeCell }) {
+    super();
+    this._cell = options.cell;
+    this._value = this._cell.variable ?? '';
+  }
+
+  private _onChange = (event: React.ChangeEvent) => {
+    this._value = (event.target as HTMLInputElement).value;
+    this._cell.variable = this._value;
   };
 
-  return <input type={'text'} onChange={onChange}></input>;
+  render() {
+    return (
+      <input
+        type={'text'}
+        onChange={this._onChange}
+        title={'The variable where to copy the cell output'}
+        defaultValue={this._value}
+      ></input>
+    );
+  }
+
+  private _cell: ICustomCodeCell;
+  private _value: string;
 }
 
 /**
