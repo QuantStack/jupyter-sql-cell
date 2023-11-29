@@ -1,15 +1,15 @@
 import { CellChange, ISharedCodeCell } from '@jupyter/ydoc';
 import { Cell, CodeCell, ICellHeader, ICellModel } from '@jupyterlab/cells';
+import { IChangedArgs } from '@jupyterlab/coreutils';
 import { Notebook, NotebookPanel } from '@jupyterlab/notebook';
-import { ReactiveToolbar } from '@jupyterlab/ui-components';
+import { ReactWidget, ReactiveToolbar } from '@jupyterlab/ui-components';
 import { Message } from '@lumino/messaging';
 import { SingletonLayout, Widget } from '@lumino/widgets';
 
 import { MAGIC } from './common';
-import { IDatabasesPanel } from './sidepanel';
-import { DatabaseSelect } from './widgets';
 import { IKernelInjection } from './kernelInjection';
-import { IChangedArgs } from '@jupyterlab/coreutils';
+import { IDatabasesPanel } from './sidepanel';
+import { DatabaseSelect, variableName } from './widgets';
 
 /**
  * The class of the header.
@@ -69,17 +69,41 @@ class CustomCodeCell extends CodeCell {
     this._kernelInjection = options.kernelInjection;
   }
 
+  /**
+   * Getter and setter of the SQL status.
+   */
+  get isSQL(): boolean {
+    return this._isSQL;
+  }
+  set isSQL(value: boolean) {
+    this._isSQL = value;
+  }
+
+  /**
+   * Set the name of the variable whose copy cell output.
+   */
+  set variable(name: string | null) {
+    this._variable = name;
+  }
+
   protected onStateChanged(
     model: ICellModel,
     args: IChangedArgs<any, any, string>
   ): void {
     super.onStateChanged(model, args);
-    if (args.name === 'executionCount' && args.newValue) {
-      this._kernelInjection.copyToKernel(this, 'my_var');
+    if (
+      args.name === 'executionCount' &&
+      args.newValue &&
+      this._isSQL &&
+      this._variable
+    ) {
+      this._kernelInjection.outputToVariable(this, this._variable);
     }
   }
 
   private _kernelInjection: IKernelInjection;
+  private _variable: string | null = null;
+  private _isSQL = false;
 }
 
 /**
@@ -150,7 +174,7 @@ export class CellHeader extends Widget implements ICellHeader {
    *
    * It adds a listener on the cell content to display or not the toolbar.
    */
-  set cell(model: CodeCell | null) {
+  set cell(model: CustomCodeCell | null) {
     this._cell = model;
     this._cell?.model.sharedModel.changed.connect(
       this._onSharedModelChanged,
@@ -163,9 +187,25 @@ export class CellHeader extends Widget implements ICellHeader {
     });
 
     this._toolbar.addItem('select', databaseSelect);
+    this._toolbar.addItem(
+      'variable',
+      ReactWidget.create(variableName(this.setVariable))
+    );
 
     this._checkSource();
   }
+
+  /**
+   * Set the variable name where to store the output of SQL query.
+   *
+   * @param variable - the variable name.
+   */
+  setVariable = (name: string | null) => {
+    if (this._cell) {
+      // null if the field is empty.
+      this._cell.variable = name || null;
+    }
+  };
 
   /**
    * Set the cell as SQL or not, and displaying the toolbar header.
@@ -173,15 +213,17 @@ export class CellHeader extends Widget implements ICellHeader {
    * @param status - boolean, whether the cell is SQL or not.
    */
   private _setCellSql(status: boolean) {
+    if (!this._cell) {
+      return;
+    }
     if (status) {
-      this._isSQL = true;
       this.addClass(HEADER_CLASS);
       (this.layout as SingletonLayout).widget = this._toolbar;
     } else {
-      this._isSQL = false;
       this.removeClass(HEADER_CLASS);
       (this.layout as SingletonLayout).removeWidget(this._toolbar);
     }
+    this._cell.isSQL = status;
   }
 
   /**
@@ -194,9 +236,9 @@ export class CellHeader extends Widget implements ICellHeader {
       return;
     }
     const sourceStart = this._cell?.model.sharedModel.source.substring(0, 5);
-    if (sourceStart === MAGIC && !this._isSQL) {
+    if (sourceStart === MAGIC && !this._cell?.isSQL) {
       this._setCellSql(true);
-    } else if (sourceStart !== MAGIC && this._isSQL) {
+    } else if (sourceStart !== MAGIC && this._cell?.isSQL) {
       this._setCellSql(false);
     }
   }
@@ -214,7 +256,7 @@ export class CellHeader extends Widget implements ICellHeader {
    * Triggered when the widget has been attached.
    */
   protected onAfterAttach(msg: Message): void {
-    this.cell = this.parent as CodeCell;
+    this.cell = this.parent as CustomCodeCell;
   }
 
   /**
@@ -235,8 +277,7 @@ export class CellHeader extends Widget implements ICellHeader {
 
   private _databasesPanel: IDatabasesPanel;
   private _kernelInjection: IKernelInjection;
-  private _cell: CodeCell | null = null;
-  private _isSQL = false;
+  private _cell: CustomCodeCell | null = null;
   private _toolbar: ReactiveToolbar;
 }
 

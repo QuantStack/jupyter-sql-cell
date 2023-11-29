@@ -1,11 +1,11 @@
 import { ISessionContext } from '@jupyterlab/apputils';
+import { CodeCell } from '@jupyterlab/cells';
 import { Notebook, NotebookPanel } from '@jupyterlab/notebook';
-import { KernelMessage, Session } from '@jupyterlab/services';
+import { Kernel, KernelMessage, Session } from '@jupyterlab/services';
 import { Token } from '@lumino/coreutils';
 import { ISignal, Signal } from '@lumino/signaling';
+
 import { LOAD_MAGIC } from './common';
-import { IKernelConnection } from '@jupyterlab/services/lib/kernel/kernel';
-import { CodeCell } from '@jupyterlab/cells';
 
 /**
  * The kernel injection token.
@@ -35,7 +35,7 @@ export interface IKernelInjection {
    * @param cell - the cell whose copy the output.
    * @param variable - the name of the variable in the kernel.
    */
-  copyToKernel(cell: CodeCell, variable: string): void;
+  outputToVariable(cell: CodeCell, variable: string): void;
   /**
    * A signal emitted when the status changes.
    */
@@ -88,7 +88,7 @@ export class KernelInjection implements IKernelInjection {
    * @param cell - the cell whose copy the output.
    * @param variable - the name of the variable in the kernel.
    */
-  copyToKernel(cell: CodeCell, variable: string) {
+  outputToVariable(cell: CodeCell, variable: string) {
     const sessionContext = ((cell.parent as Notebook)?.parent as NotebookPanel)
       ?.sessionContext;
     if (
@@ -134,7 +134,7 @@ export class KernelInjection implements IKernelInjection {
    * Run code in the specified kernel.
    */
   private async _runCode(
-    kernel: IKernelConnection,
+    kernel: Kernel.IKernelConnection,
     code: string
   ): Promise<KernelMessage.IExecuteReplyMsg | null> {
     return kernel.info

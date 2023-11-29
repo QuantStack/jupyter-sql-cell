@@ -1,6 +1,5 @@
 import { ICellModel } from '@jupyterlab/cells';
 import { ReactWidget } from '@jupyterlab/ui-components';
-
 import React from 'react';
 
 import { MAGIC } from './common';
@@ -65,6 +64,19 @@ export class DatabaseSelect extends ReactWidget {
 
   private _cellModel: ICellModel | undefined;
   private _databasesPanel: IDatabasesPanel;
+}
+
+/**
+ * An input to set the variable name, where to store the output of sql.
+ *
+ * @param fn : the callback function.
+ */
+export function variableName(fn: (variable: string) => void) {
+  const onChange = (event: React.ChangeEvent) => {
+    fn((event.target as HTMLInputElement).value);
+  };
+
+  return <input type={'text'} onChange={onChange}></input>;
 }
 
 /**
