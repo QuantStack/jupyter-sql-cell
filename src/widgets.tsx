@@ -1,9 +1,8 @@
 import { ICellModel } from '@jupyterlab/cells';
 import { ReactWidget } from '@jupyterlab/ui-components';
-
 import React from 'react';
 
-import { MAGIC } from './common';
+import { ICustomCodeCell, MAGIC } from './common';
 import { Database } from './databases';
 import { IDatabasesPanel } from './sidepanel';
 
@@ -12,7 +11,7 @@ import { IDatabasesPanel } from './sidepanel';
  */
 export class DatabaseSelect extends ReactWidget {
   constructor(options: {
-    cellModel: ICellModel | null;
+    cellModel: ICellModel | undefined;
     databasesPanel: IDatabasesPanel;
   }) {
     super();
@@ -40,31 +39,61 @@ export class DatabaseSelect extends ReactWidget {
       }
     });
     return (
-      <div>
-        <label>
-          Database:&nbsp;
-          <select
-            onChange={this.onChange}
-            className={'jp-sqlcell-select'}
-            disabled={this._cellModel?.type !== 'code'}
-          >
-            <option disabled selected={currentDatabase === defaultValue}>
-              {defaultValue}
-            </option>
-            ;
-            {aliases.map(alias => {
-              return (
-                <option selected={currentDatabase === alias}>{alias}</option>
-              );
-            })}
-          </select>
-        </label>
-      </div>
+      <label>
+        Database:&nbsp;
+        <select
+          onChange={this.onChange}
+          className={'jp-sqlcell-select'}
+          disabled={this._cellModel?.type !== 'code'}
+        >
+          <option disabled selected={currentDatabase === defaultValue}>
+            {defaultValue}
+          </option>
+          ;
+          {aliases.map(alias => {
+            return (
+              <option selected={currentDatabase === alias}>{alias}</option>
+            );
+          })}
+        </select>
+      </label>
     );
   }
 
-  private _cellModel: ICellModel | null;
+  private _cellModel: ICellModel | undefined;
   private _databasesPanel: IDatabasesPanel;
+}
+
+/**
+ * An input to set the variable name, where to store the output of sql.
+ *
+ * @param fn : the callback function.
+ */
+export class VariableName extends ReactWidget {
+  constructor(options: { cell: ICustomCodeCell }) {
+    super();
+    this._cell = options.cell;
+    this._value = this._cell.variable ?? '';
+  }
+
+  private _onChange = (event: React.ChangeEvent) => {
+    this._value = (event.target as HTMLInputElement).value;
+    this._cell.variable = this._value;
+  };
+
+  render() {
+    return (
+      <input
+        type={'text'}
+        onChange={this._onChange}
+        title={'The variable where to copy the cell output'}
+        defaultValue={this._value}
+      ></input>
+    );
+  }
+
+  private _cell: ICustomCodeCell;
+  private _value: string;
 }
 
 /**
@@ -72,7 +101,7 @@ export class DatabaseSelect extends ReactWidget {
  */
 namespace Private {
   export function getDatabaseUrl(
-    cellModel: ICellModel | null
+    cellModel: ICellModel | undefined
   ): string | undefined {
     if (!cellModel) {
       return;

@@ -1,5 +1,11 @@
+import { ISessionContext } from '@jupyterlab/apputils';
+import { CodeCell } from '@jupyterlab/cells';
+import { Notebook, NotebookPanel } from '@jupyterlab/notebook';
+import { Kernel, KernelMessage, Session } from '@jupyterlab/services';
 import { Token } from '@lumino/coreutils';
 import { ISignal, Signal } from '@lumino/signaling';
+
+import { LOAD_MAGIC } from './common';
 
 /**
  * The kernel injection token.
@@ -14,13 +20,26 @@ export const IKernelInjection = new Token<IKernelInjection>(
  */
 export interface IKernelInjection {
   /**
-   * Whether the current kernel has the function to populate data.
+   * Whether the kernel associated to the cell can handle SQL magic.
    */
-  status: boolean;
+  getStatus(cell: CodeCell | null): boolean;
+  /**
+   * Add a new session context to the map.
+   *
+   * @param sessionContext - the session context to add.
+   */
+  addSessionContext(sessionContext: ISessionContext): void;
+  /**
+   * Copy a cell output to a variable in the kernel.
+   *
+   * @param cell - the cell whose copy the output.
+   * @param variable - the name of the variable in the kernel.
+   */
+  outputToVariable(cell: CodeCell, variable: string): void;
   /**
    * A signal emitted when the status changes.
    */
-  readonly statusChanged: ISignal<this, boolean>;
+  readonly statusChanged: ISignal<this, void>;
 }
 
 /**
@@ -28,15 +47,116 @@ export interface IKernelInjection {
  */
 export class KernelInjection implements IKernelInjection {
   /**
-   * Getter and setter of the status.
+   * Whether the kernel associated to the cell can handle SQL magic.
    */
-  get status(): boolean {
-    return this._status;
+  getStatus(cell: CodeCell | null): boolean {
+    const sessionContext = ((cell?.parent as Notebook)?.parent as NotebookPanel)
+      ?.sessionContext;
+    return this._status.get(sessionContext) ?? false;
   }
-  set status(value: boolean) {
-    this._status = value;
-    this.statusChanged.emit(value);
+
+  /**
+   * Add a new session context to the map.
+   *
+   * @param sessionContext - the session context to add.
+   */
+  addSessionContext(sessionContext: ISessionContext) {
+    if (this._status.get(sessionContext) !== undefined) {
+      return;
+    }
+
+    this._status.set(sessionContext, false);
+
+    const kernel = sessionContext?.session?.kernel;
+    if (kernel) {
+      this._onKernelChanged(sessionContext, {
+        name: 'kernel',
+        oldValue: null,
+        newValue: kernel
+      });
+    }
+    sessionContext?.kernelChanged.connect(this._onKernelChanged, this);
+
+    sessionContext.disposed.connect(sessionContext => {
+      sessionContext.kernelChanged.disconnect(this._onKernelChanged, this);
+    });
   }
-  private _status = false;
-  readonly statusChanged = new Signal<this, boolean>(this);
+
+  /**
+   * Copy a cell output to a variable in the kernel.
+   *
+   * @param cell - the cell whose copy the output.
+   * @param variable - the name of the variable in the kernel.
+   */
+  outputToVariable(cell: CodeCell, variable: string) {
+    const sessionContext = ((cell.parent as Notebook)?.parent as NotebookPanel)
+      ?.sessionContext;
+    if (
+      sessionContext &&
+      this._status.get(sessionContext) &&
+      cell.model.executionCount
+    ) {
+      const kernel = sessionContext.session?.kernel;
+      if (kernel) {
+        const code = `${variable} = _${cell.model.executionCount}`;
+        this._runCode(kernel, code).then(reply => {
+          if (reply?.content.status !== 'ok') {
+            console.warn('Error while copying the SQL output to variable');
+          }
+        });
+      }
+    }
+  }
+
+  /**
+   * Triggered when the current kernel changes.
+   */
+  private _onKernelChanged = async (
+    sessionContext: ISessionContext,
+    kernelChange: Session.ISessionConnection.IKernelChangedArgs
+  ) => {
+    this._status.set(sessionContext, false);
+    const kernel = kernelChange.newValue;
+    if (kernel) {
+      this._runCode(kernel, LOAD_MAGIC).then(reply => {
+        if (reply) {
+          this._status.set(sessionContext, reply.content.status === 'ok');
+          this.statusChanged.emit();
+        }
+        if (reply?.content.status !== 'ok') {
+          console.warn('The kernel does not support SQL magics');
+        }
+      });
+    }
+  };
+
+  /**
+   * Run code in the specified kernel.
+   */
+  private async _runCode(
+    kernel: Kernel.IKernelConnection,
+    code: string
+  ): Promise<KernelMessage.IExecuteReplyMsg | null> {
+    return kernel.info
+      .then(async () => {
+        const content: KernelMessage.IExecuteRequestMsg['content'] = {
+          code,
+          store_history: false
+        };
+        const future = kernel.requestExecute(content);
+        return future.done
+          .then(reply => {
+            return reply;
+          })
+          .catch(error => {
+            return null;
+          });
+      })
+      .catch(() => {
+        return null;
+      });
+  }
+
+  readonly statusChanged = new Signal<this, void>(this);
+  private _status = new Map<ISessionContext, boolean>();
 }

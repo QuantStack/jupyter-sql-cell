@@ -3,15 +3,16 @@ import {
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
-import { ISessionContext } from '@jupyterlab/apputils';
 import { IEditorServices } from '@jupyterlab/codeeditor';
-import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
-import { KernelMessage, Session } from '@jupyterlab/services';
+import {
+  INotebookWidgetFactory,
+  NotebookPanel,
+  NotebookWidgetFactory
+} from '@jupyterlab/notebook';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { ITranslator, nullTranslator } from '@jupyterlab/translation';
 
 import { NotebookContentFactory } from './cellfactory';
-import { LOAD_MAGIC } from './common';
 import { IKernelInjection, KernelInjection } from './kernelInjection';
 import { DatabasesPanel, IDatabasesPanel } from './sidepanel';
 
@@ -107,7 +108,7 @@ const kernelInjection: JupyterFrontEndPlugin<IKernelInjection> = {
  *
  * ### NOTES:
  * This plugin must be separated from 'kernelInjection' to avoid cycle dependencies.
- * Indeed, this plugin requires 'INotebookTracker', which requires
+ * Indeed, this plugin requires 'INotebookWidgetFactory', which requires
  * 'NotebookPanel.IContentFactory'.
  * However, the custom 'NotebookPanel.IContentFactory', provided here in
  * 'notebookFactory', requires 'kernelInjection'.
@@ -116,50 +117,14 @@ const kernelInjector: JupyterFrontEndPlugin<void> = {
   id: '@jupyter/sql-cell:kernel-injector',
   description: 'A JupyterLab extension to inject code in notebook kernel',
   autoStart: true,
-  requires: [IKernelInjection, INotebookTracker],
+  requires: [IKernelInjection, INotebookWidgetFactory],
   activate: (
     app: JupyterFrontEnd,
     kernelInjection: IKernelInjection,
-    tracker: INotebookTracker
+    notebookFactory: NotebookWidgetFactory.IFactory
   ) => {
-    let sessionContext: ISessionContext | undefined = undefined;
-
-    /**
-     * Triggered when the current notebook or current kernel changes.
-     */
-    const onKernelChanged = async (
-      _sessionContext: ISessionContext,
-      kernelChange: Session.ISessionConnection.IKernelChangedArgs
-    ) => {
-      kernelInjection.status = false;
-      const kernel = kernelChange.newValue;
-      if (kernel) {
-        kernel.info.then(info => {
-          const code = LOAD_MAGIC;
-          const content: KernelMessage.IExecuteRequestMsg['content'] = { code };
-          const future = kernel.requestExecute(content);
-          future.done.then(reply => {
-            kernelInjection.status = reply.content.status === 'ok';
-            if (!(reply.content.status === 'ok')) {
-              console.warn('The kernel does not support SQL magics');
-            }
-          });
-        });
-      }
-    };
-
-    tracker.currentChanged.connect((_, panel) => {
-      sessionContext?.kernelChanged.disconnect(onKernelChanged);
-      sessionContext = panel?.sessionContext;
-      const kernel = sessionContext?.session?.kernel;
-      if (sessionContext && kernel) {
-        onKernelChanged(sessionContext, {
-          name: 'kernel',
-          oldValue: null,
-          newValue: kernel
-        });
-      }
-      sessionContext?.kernelChanged.connect(onKernelChanged);
+    notebookFactory.widgetCreated.connect((_, panel) => {
+      kernelInjection.addSessionContext(panel.sessionContext);
     });
   }
 };
