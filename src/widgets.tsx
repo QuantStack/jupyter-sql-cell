@@ -107,8 +107,8 @@ namespace Private {
     if (!cellModel) {
       return;
     }
-    const regexp = new RegExp(`^${MAGIC}\\s+((?!\\s).*)`);
     const magicLine = cellModel.sharedModel.source.split('\n')[0];
+    const regexp = new RegExp(`^${MAGIC}\\s+([^\\s]+)`);
     const match = magicLine.match(regexp);
     if (match && match.length > 1) {
       return match[1];
@@ -125,13 +125,12 @@ namespace Private {
     cellModel: ICellModel,
     database: Database | undefined
   ): void {
-    let magicLine = MAGIC;
+    const sourceArray = cellModel.sharedModel.source.split('\n');
+    const magicLine = sourceArray[0].split(/\s+/);
     if (database) {
-      magicLine += ` ${database.url}`;
+      magicLine[1] = `${database.url}`;
     }
-    const source = cellModel.sharedModel.source;
-    const sourceArray = source.split('\n');
-    sourceArray[0] = magicLine;
+    sourceArray[0] = magicLine.join(' ');
     cellModel.sharedModel.source = sourceArray.join('\n');
   }
 }
