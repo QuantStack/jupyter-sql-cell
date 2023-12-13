@@ -42,6 +42,7 @@ ul.jp-sqlcell-column-items {
   align-items: center;
 }
 
+/* stylelint-disable-next-line selector-class-pattern */
 .jp-sqlcell-header .jp-Toolbar input {
   height: 50%;
 }
