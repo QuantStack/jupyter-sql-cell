@@ -4,7 +4,7 @@ import { IChangedArgs } from '@jupyterlab/coreutils';
 import { Notebook, NotebookPanel } from '@jupyterlab/notebook';
 import { ReactiveToolbar } from '@jupyterlab/ui-components';
 import { Message } from '@lumino/messaging';
-import { SingletonLayout, Widget } from '@lumino/widgets';
+import { PanelLayout, SingletonLayout, Widget } from '@lumino/widgets';
 
 import { ICustomCodeCell, MAGIC } from './common';
 import { IKernelInjection } from './kernelInjection';
@@ -45,8 +45,7 @@ export class NotebookContentFactory
     const kernelInjection = this._kernelInjection;
     const cellContentFactory = new CellContentFactory({
       databasesPanel,
-      editorFactory,
-      kernelInjection
+      editorFactory
     });
     const cell = new CustomCodeCell({
       ...options,
@@ -61,12 +60,43 @@ export class NotebookContentFactory
 }
 
 /**
+ * The namespace for Notebook content factory.
+ */
+export namespace ContentFactory {
+  /**
+   * The content factory options.
+   */
+  export interface IOptions extends CellContentFactory.IOptions {
+    /**
+     * The kernel injection, whether the kernel can handle sql magics or not.
+     */
+    kernelInjection: IKernelInjection;
+  }
+}
+
+/**
  * A custom code cell to copy the output in a variable when the cell is executed.
  */
 class CustomCodeCell extends CodeCell implements ICustomCodeCell {
   constructor(options: CustomCodeCell.IOptions) {
     super(options);
     this._kernelInjection = options.kernelInjection;
+
+    this.model.sharedModel.changed.connect(this._onSharedModelChanged, this);
+
+    this._kernelInjection.statusChanged.connect(() => {
+      this._checkSource();
+    }, this);
+  }
+
+  protected initializeDOM(): void {
+    super.initializeDOM();
+    this._header = (this.layout as PanelLayout).widgets.find(
+      widget => widget instanceof CellHeader
+    ) as CellHeader;
+
+    this._header.createToolbar(this);
+    this._checkSource();
   }
 
   /**
@@ -77,6 +107,7 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
   }
   set isSQL(value: boolean) {
     this._isSQL = value;
+    this._header?.setCellSql(value);
   }
 
   /**
@@ -104,6 +135,33 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
     }
   }
 
+  /**
+   * Check the source of the cell for the MAGIC command, and attach or detach
+   * the toolbar if necessary.
+   */
+  private _checkSource() {
+    if (!this._kernelInjection.getStatus(this)) {
+      this.isSQL = false;
+      return;
+    }
+    const sourceStart = this.model.sharedModel.source.substring(0, 5);
+    if (sourceStart === MAGIC && !this.isSQL) {
+      this.isSQL = true;
+    } else if (sourceStart !== MAGIC && this.isSQL) {
+      this.isSQL = false;
+    }
+  }
+
+  /**
+   * Triggered when the shared model change.
+   */
+  private _onSharedModelChanged = (_: ISharedCodeCell, change: CellChange) => {
+    if (this._kernelInjection.getStatus(this) && change.sourceChange) {
+      this._checkSource();
+    }
+  };
+
+  private _header: CellHeader | undefined = undefined;
   private _kernelInjection: IKernelInjection;
   private _variable: string | null = null;
   private _isSQL = false;
@@ -134,10 +192,9 @@ export class CellContentFactory
   /**
    * Create a content factory for a cell.
    */
-  constructor(options: ContentFactory.IOptions) {
+  constructor(options: CellContentFactory.IOptions) {
     super(options);
     this._databasesPanel = options.databasesPanel;
-    this._kernelInjection = options.kernelInjection;
   }
 
   /**
@@ -145,12 +202,25 @@ export class CellContentFactory
    */
   createCellHeader(): ICellHeader {
     const databasesPanel = this._databasesPanel;
-    const kernelInjection = this._kernelInjection;
-    return new CellHeader({ databasesPanel, kernelInjection });
+    return new CellHeader({ databasesPanel });
   }
 
   private _databasesPanel: IDatabasesPanel;
-  private _kernelInjection: IKernelInjection;
+}
+
+/**
+ * The namespace for cell content factory.
+ */
+export namespace CellContentFactory {
+  /**
+   * The content factory options.
+   */
+  export interface IOptions extends Cell.ContentFactory.IOptions {
+    /**
+     * The databases panel, containing the known databases.
+     */
+    databasesPanel: IDatabasesPanel;
+  }
 }
 
 /**
@@ -160,19 +230,11 @@ export class CellHeader extends Widget implements ICellHeader {
   /**
    * Creates a cell header.
    */
-  constructor(options: {
-    databasesPanel: IDatabasesPanel;
-    kernelInjection: IKernelInjection;
-  }) {
+  constructor(options: { databasesPanel: IDatabasesPanel }) {
     super();
     this.layout = new SingletonLayout();
     this._databasesPanel = options.databasesPanel;
-    this._kernelInjection = options.kernelInjection;
     this._toolbar = new ReactiveToolbar();
-
-    this._kernelInjection.statusChanged.connect(() => {
-      this._checkSource();
-    }, this);
   }
 
   /**
@@ -180,52 +242,24 @@ export class CellHeader extends Widget implements ICellHeader {
    *
    * It adds a listener on the cell content to display or not the toolbar.
    */
-  set cell(customCodeCell: CustomCodeCell | null) {
-    this._cell = customCodeCell;
-
-    if (!this._cell) {
-      return;
-    }
-
-    this._cell?.model.sharedModel.changed.connect(
-      this._onSharedModelChanged,
-      this
-    );
-
+  createToolbar(cell: CustomCodeCell) {
     const databaseSelect = new DatabaseSelect({
-      cellModel: this._cell?.model,
+      cellModel: cell?.model,
       databasesPanel: this._databasesPanel
     });
 
     this._toolbar.addItem('select', databaseSelect);
 
-    const variableName = new VariableName({ cell: this._cell });
+    const variableName = new VariableName({ cell });
     this._toolbar.addItem('variable', variableName);
-
-    this._checkSource();
   }
-
-  /**
-   * Set the variable name where to store the output of SQL query.
-   *
-   * @param variable - the variable name.
-   */
-  setVariable = (name: string | null) => {
-    if (this._cell) {
-      // null if the field is empty.
-      this._cell.variable = name || null;
-    }
-  };
 
   /**
    * Set the cell as SQL or not, and displaying the toolbar header.
    *
    * @param status - boolean, whether the cell is SQL or not.
    */
-  private _setCellSql(status: boolean) {
-    if (!this._cell) {
-      return;
-    }
+  setCellSql(status: boolean) {
     if (status) {
       this.addClass(HEADER_CLASS);
       (this.layout as SingletonLayout).widget = this._toolbar;
@@ -233,40 +267,6 @@ export class CellHeader extends Widget implements ICellHeader {
       this.removeClass(HEADER_CLASS);
       (this.layout as SingletonLayout).removeWidget(this._toolbar);
     }
-    this._cell.isSQL = status;
-  }
-
-  /**
-   * Check the source of the cell for the MAGIC command, and attach or detach
-   * the toolbar if necessary.
-   */
-  private _checkSource() {
-    if (!this._kernelInjection.getStatus(this._cell)) {
-      this._setCellSql(false);
-      return;
-    }
-    const sourceStart = this._cell?.model.sharedModel.source.substring(0, 5);
-    if (sourceStart === MAGIC && !this._cell?.isSQL) {
-      this._setCellSql(true);
-    } else if (sourceStart !== MAGIC && this._cell?.isSQL) {
-      this._setCellSql(false);
-    }
-  }
-
-  /**
-   * Triggered when the shared model change.
-   */
-  private _onSharedModelChanged = (_: ISharedCodeCell, change: CellChange) => {
-    if (this._kernelInjection.getStatus(this._cell) && change.sourceChange) {
-      this._checkSource();
-    }
-  };
-
-  /**
-   * Triggered when the widget has been attached.
-   */
-  protected onAfterAttach(msg: Message): void {
-    this.cell = this.parent as CustomCodeCell;
   }
 
   /**
@@ -274,38 +274,8 @@ export class CellHeader extends Widget implements ICellHeader {
    */
   protected onBeforeDetach(msg: Message): void {
     (this.layout as SingletonLayout).removeWidget(this._toolbar);
-
-    this._kernelInjection.statusChanged.disconnect((_, status) => {
-      this._checkSource();
-    }, this);
-
-    this._cell?.model.sharedModel.changed.disconnect(
-      this._onSharedModelChanged,
-      this
-    );
   }
 
   private _databasesPanel: IDatabasesPanel;
-  private _kernelInjection: IKernelInjection;
-  private _cell: CustomCodeCell | null = null;
   private _toolbar: ReactiveToolbar;
-}
-
-/**
- * The namespace for content factory.
- */
-export namespace ContentFactory {
-  /**
-   * The content factory options.
-   */
-  export interface IOptions extends Cell.ContentFactory.IOptions {
-    /**
-     * The databases panel, containing the known databases.
-     */
-    databasesPanel: IDatabasesPanel;
-    /**
-     * The kernel injection, whether the kernel can handle sql magics or not.
-     */
-    kernelInjection: IKernelInjection;
-  }
 }

@@ -85,6 +85,7 @@ export class VariableName extends ReactWidget {
     return (
       <input
         type={'text'}
+        placeholder={'Variable name'}
         onChange={this._onChange}
         title={'The variable where to copy the cell output'}
         defaultValue={this._value}
