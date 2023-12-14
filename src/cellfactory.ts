@@ -6,10 +6,11 @@ import { ReactiveToolbar } from '@jupyterlab/ui-components';
 import { Message } from '@lumino/messaging';
 import { PanelLayout, SingletonLayout, Widget } from '@lumino/widgets';
 
-import { ICustomCodeCell, MAGIC } from './common';
+import { ICustomCodeCell, MAGIC, MagicLine } from './common';
 import { IKernelInjection } from './kernelInjection';
 import { IDatabasesPanel } from './sidepanel';
 import { DatabaseSelect, VariableName } from './widgets';
+import { ISignal, Signal } from '@lumino/signaling';
 
 /**
  * The class of the header.
@@ -50,7 +51,8 @@ export class NotebookContentFactory
     const cell = new CustomCodeCell({
       ...options,
       contentFactory: cellContentFactory,
-      kernelInjection
+      kernelInjection,
+      databasesPanel
     }).initializeState();
     return cell;
   }
@@ -81,22 +83,12 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
   constructor(options: CustomCodeCell.IOptions) {
     super(options);
     this._kernelInjection = options.kernelInjection;
-
+    this._databasePanel = options.databasesPanel;
     this.model.sharedModel.changed.connect(this._onSharedModelChanged, this);
 
     this._kernelInjection.statusChanged.connect(() => {
       this._checkSource();
     }, this);
-  }
-
-  protected initializeDOM(): void {
-    super.initializeDOM();
-    this._header = (this.layout as PanelLayout).widgets.find(
-      widget => widget instanceof CellHeader
-    ) as CellHeader;
-
-    this._header.createToolbar(this);
-    this._checkSource();
   }
 
   /**
@@ -120,6 +112,23 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
     this._variable = name;
   }
 
+  /**
+   * A signal emitted when the first line changed.
+   */
+  get databaseChanged(): ISignal<ICustomCodeCell, string> {
+    return this._databaseChanged;
+  }
+
+  protected initializeDOM(): void {
+    super.initializeDOM();
+    this._header = (this.layout as PanelLayout).widgets.find(
+      widget => widget instanceof CellHeader
+    ) as CellHeader;
+
+    this._header.createToolbar(this);
+    this._checkSource();
+  }
+
   protected onStateChanged(
     model: ICellModel,
     args: IChangedArgs<any, any, string>
@@ -139,17 +148,21 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
    * Check the source of the cell for the MAGIC command, and attach or detach
    * the toolbar if necessary.
    */
-  private _checkSource() {
+  private _checkSource(): boolean {
     if (!this._kernelInjection.getStatus(this)) {
       this.isSQL = false;
-      return;
+      return false;
     }
-    const sourceStart = this.model.sharedModel.source.substring(0, 5);
+    const sourceStart = this.model.sharedModel.source.substring(
+      0,
+      MAGIC.length
+    );
     if (sourceStart === MAGIC && !this.isSQL) {
       this.isSQL = true;
     } else if (sourceStart !== MAGIC && this.isSQL) {
       this.isSQL = false;
     }
+    return this.isSQL;
   }
 
   /**
@@ -157,14 +170,33 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
    */
   private _onSharedModelChanged = (_: ISharedCodeCell, change: CellChange) => {
     if (this._kernelInjection.getStatus(this) && change.sourceChange) {
-      this._checkSource();
+      const firstLine = this.model.sharedModel.source.split('\n')[0];
+
+      // If an object with the key 'retain' exists, it will give the position of the
+      // change. Otherwise we assume the change occurs at position 0;
+      const position =
+        change.sourceChange.find(change => change.retain !== undefined)
+          ?.retain || 0;
+
+      // Check if the change occurs on the first line to update header and widgets.
+      if (position <= firstLine.length) {
+        if (this._checkSource()) {
+          const databaseURL = MagicLine.getDatabaseUrl(this.model);
+          const databaseAlias =
+            this._databasePanel.databases.find(db => db.url === databaseURL)
+              ?.alias ?? ' - ';
+          this._databaseChanged.emit(databaseAlias);
+        }
+      }
     }
   };
 
   private _header: CellHeader | undefined = undefined;
   private _kernelInjection: IKernelInjection;
+  private _databasePanel: IDatabasesPanel;
   private _variable: string | null = null;
   private _isSQL = false;
+  private _databaseChanged = new Signal<ICustomCodeCell, string>(this);
 }
 
 /**
@@ -179,6 +211,10 @@ namespace CustomCodeCell {
      * The kernel injection, whether the kernel can handle sql magics or not.
      */
     kernelInjection: IKernelInjection;
+    /**
+     * The databases panel, containing the known databases.
+     */
+    databasesPanel: IDatabasesPanel;
   }
 }
 
@@ -245,7 +281,8 @@ export class CellHeader extends Widget implements ICellHeader {
   createToolbar(cell: CustomCodeCell) {
     const databaseSelect = new DatabaseSelect({
       cellModel: cell?.model,
-      databasesPanel: this._databasesPanel
+      databasesPanel: this._databasesPanel,
+      databaseChanged: cell.databaseChanged
     });
 
     this._toolbar.addItem('select', databaseSelect);
