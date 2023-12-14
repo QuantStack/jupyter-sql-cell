@@ -148,10 +148,10 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
    * Check the source of the cell for the MAGIC command, and attach or detach
    * the toolbar if necessary.
    */
-  private _checkSource() {
+  private _checkSource(): boolean {
     if (!this._kernelInjection.getStatus(this)) {
       this.isSQL = false;
-      return;
+      return false;
     }
     const sourceStart = this.model.sharedModel.source.substring(
       0,
@@ -162,6 +162,7 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
     } else if (sourceStart !== MAGIC && this.isSQL) {
       this.isSQL = false;
     }
+    return this.isSQL;
   }
 
   /**
@@ -179,12 +180,13 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
 
       // Check if the change occurs on the first line to update header and widgets.
       if (position <= firstLine.length) {
-        this._checkSource();
-        const databaseURL = MagicLine.getDatabaseUrl(this.model);
-        const databaseAlias =
-          this._databasePanel.databases.find(db => db.url === databaseURL)
-            ?.alias ?? ' - ';
-        this._databaseChanged.emit(databaseAlias);
+        if (this._checkSource()) {
+          const databaseURL = MagicLine.getDatabaseUrl(this.model);
+          const databaseAlias =
+            this._databasePanel.databases.find(db => db.url === databaseURL)
+              ?.alias ?? ' - ';
+          this._databaseChanged.emit(databaseAlias);
+        }
       }
     }
   };
