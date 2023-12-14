@@ -169,12 +169,16 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
    */
   private _onSharedModelChanged = (_: ISharedCodeCell, change: CellChange) => {
     if (this._kernelInjection.getStatus(this) && change.sourceChange) {
-      // Check if the change is in the first line
       const firstLine = this.model.sharedModel.source.split('\n')[0];
-      const position = change.sourceChange.find(
-        change => change.retain !== undefined
-      )?.retain;
-      if (position !== undefined && position <= firstLine.length) {
+
+      // If an object with the key 'retain' exists, it will give the position of the
+      // change. Otherwise we assume the change occurs at position 0;
+      const position =
+        change.sourceChange.find(change => change.retain !== undefined)
+          ?.retain || 0;
+
+      // Check if the change occurs on the first line to update header and widgets.
+      if (position <= firstLine.length) {
         this._checkSource();
         const databaseURL = MagicLine.getDatabaseUrl(this.model);
         const databaseAlias =
