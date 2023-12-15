@@ -1,6 +1,5 @@
 import { CellChange, ISharedCodeCell } from '@jupyter/ydoc';
-import { Cell, CodeCell, ICellHeader, ICellModel } from '@jupyterlab/cells';
-import { IChangedArgs } from '@jupyterlab/coreutils';
+import { Cell, CodeCell, ICellHeader } from '@jupyterlab/cells';
 import { Notebook, NotebookPanel } from '@jupyterlab/notebook';
 import { ReactiveToolbar } from '@jupyterlab/ui-components';
 import { Message } from '@lumino/messaging';
@@ -103,16 +102,6 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
   }
 
   /**
-   * Getter and setter of the name of the variable to copy the cell output to.
-   */
-  get variable(): string | null {
-    return this._variable;
-  }
-  set variable(name: string | null) {
-    this._variable = name;
-  }
-
-  /**
    * A signal emitted when the first line changed.
    */
   get databaseChanged(): ISignal<ICustomCodeCell, string> {
@@ -127,21 +116,6 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
 
     this._header.createToolbar(this);
     this._checkSource();
-  }
-
-  protected onStateChanged(
-    model: ICellModel,
-    args: IChangedArgs<any, any, string>
-  ): void {
-    super.onStateChanged(model, args);
-    if (
-      args.name === 'executionCount' &&
-      args.newValue &&
-      this._isSQL &&
-      this._variable
-    ) {
-      this._kernelInjection.outputToVariable(this, this._variable);
-    }
   }
 
   /**
@@ -194,7 +168,6 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
   private _header: CellHeader | undefined = undefined;
   private _kernelInjection: IKernelInjection;
   private _databasePanel: IDatabasesPanel;
-  private _variable: string | null = null;
   private _isSQL = false;
   private _databaseChanged = new Signal<ICustomCodeCell, string>(this);
 }

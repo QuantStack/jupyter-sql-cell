@@ -23,10 +23,6 @@ export interface ICustomCodeCell {
    * The SQL status.
    */
   isSQL: boolean;
-  /**
-   * The name of the variable to copy the cell output to.
-   */
-  variable: string | null;
 }
 
 /**
