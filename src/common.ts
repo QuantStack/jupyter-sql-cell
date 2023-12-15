@@ -72,10 +72,7 @@ export namespace MagicLine {
    *
    * @param cellModel - the model of the cell to look for the database URL.
    */
-  export function getVariable(cellModel: ICodeCellModel): {
-    value: string;
-    displayOutput: boolean;
-  } {
+  export function getVariable(cellModel: ICodeCellModel): IVariable {
     const magicLine = cellModel.sharedModel.source.split('\n')[0];
     const regexp = new RegExp(`^${MAGIC}.*\\s(\\w+)(=?)\\s*<<$`);
     const match = magicLine.match(regexp);
@@ -93,15 +90,16 @@ export namespace MagicLine {
    */
   export function setVariable(
     cellModel: ICodeCellModel,
-    value: string | undefined,
-    displayOutput: boolean = false
+    variable: IVariable
   ): void {
     const sourceArray = cellModel.sharedModel.source.split('\n');
     let magicLine = sourceArray[0];
     const regexp = new RegExp(`^${MAGIC}.*(\\s\\w+=?\\s*<<)$`);
     const match = magicLine.match(regexp);
 
-    const variableText = value ? ` ${value}${displayOutput ? '=' : ''} <<` : '';
+    const variableText = variable.value
+      ? ` ${variable.value}${variable.displayOutput ? '=' : ''} <<`
+      : '';
 
     if (match) {
       magicLine = magicLine.replace(match[1], variableText);
@@ -110,5 +108,16 @@ export namespace MagicLine {
     }
     sourceArray[0] = magicLine;
     cellModel.sharedModel.source = sourceArray.join('\n');
+  }
+
+  export interface IVariable {
+    /**
+     * The variable name.
+     */
+    value: string;
+    /**
+     * Whether the output should be displayed or not.
+     */
+    displayOutput: boolean;
   }
 }

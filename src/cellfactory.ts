@@ -108,6 +108,13 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
     return this._databaseChanged;
   }
 
+  /**
+   * A signal emitted when the first line changed.
+   */
+  get variableChanged(): ISignal<ICustomCodeCell, MagicLine.IVariable> {
+    return this._variableChanged;
+  }
+
   protected initializeDOM(): void {
     super.initializeDOM();
     this._header = (this.layout as PanelLayout).widgets.find(
@@ -160,6 +167,9 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
             this._databasePanel.databases.find(db => db.url === databaseURL)
               ?.alias ?? ' - ';
           this._databaseChanged.emit(databaseAlias);
+
+          const variable = MagicLine.getVariable(this.model);
+          this._variableChanged.emit(variable);
         }
       }
     }
@@ -170,6 +180,9 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
   private _databasePanel: IDatabasesPanel;
   private _isSQL = false;
   private _databaseChanged = new Signal<ICustomCodeCell, string>(this);
+  private _variableChanged = new Signal<ICustomCodeCell, MagicLine.IVariable>(
+    this
+  );
 }
 
 /**
@@ -260,7 +273,10 @@ export class CellHeader extends Widget implements ICellHeader {
 
     this._toolbar.addItem('select', databaseSelect);
 
-    const variableName = new VariableName({ cell });
+    const variableName = new VariableName({
+      cell,
+      variableChanged: cell.variableChanged
+    });
     this._toolbar.addItem('variable', variableName);
   }
 

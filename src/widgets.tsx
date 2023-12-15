@@ -78,12 +78,14 @@ export class DatabaseSelect extends ReactWidget {
  * @param fn : the callback function.
  */
 export class VariableName extends ReactWidget {
-  constructor(options: { cell: ICustomCodeCell }) {
+  constructor(options: {
+    cell: ICustomCodeCell;
+    variableChanged: ISignal<ICustomCodeCell, MagicLine.IVariable>;
+  }) {
     super();
     this._cell = options.cell;
-    const { value, displayOutput } = MagicLine.getVariable(this._cell.model);
-    this._value = value;
-    this._displayOutput = displayOutput;
+    this._variable = MagicLine.getVariable(this._cell.model);
+    this._variableChanged = options.variableChanged;
   }
 
   /**
@@ -94,50 +96,53 @@ export class VariableName extends ReactWidget {
     const temp = target.value;
 
     // Allow only variable pattern
-    this._value = temp.replace(/^[^a-zA-Z_]|[^\w]/g, '');
-    if (this._value !== temp) {
+    this._variable.value = temp.replace(/^[^a-zA-Z_]|[^\w]/g, '');
+    if (this._variable.value !== temp) {
       const cursorPosition = target.selectionStart ?? 1;
-      target.value = this._value;
+      target.value = this._variable.value;
       // Restore the position of the cursor.
       target.setSelectionRange(cursorPosition - 1, cursorPosition - 1);
     }
-    MagicLine.setVariable(this._cell?.model, this._value, this._displayOutput);
+    MagicLine.setVariable(this._cell?.model, this._variable);
   };
 
   /**
    * triggered when the checkbox value changes.
    */
   private _onDisplayOutputChange = (event: React.ChangeEvent) => {
-    this._displayOutput = (event.target as HTMLInputElement).checked;
-    console.log(this._displayOutput);
-    MagicLine.setVariable(this._cell?.model, this._value, this._displayOutput);
+    this._variable.displayOutput = (event.target as HTMLInputElement).checked;
+    MagicLine.setVariable(this._cell?.model, this._variable);
   };
 
   render() {
     return (
-      <div className={'jp-sqlcell-variable'}>
-        <input
-          type={'text'}
-          placeholder={'Variable name'}
-          onChange={this._onVariableChange}
-          title={'The variable where to copy the cell output'}
-          defaultValue={this._value}
-        ></input>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <label htmlFor={'display-output'}>Display output</label>
-          <input
-            type={'checkbox'}
-            onChange={this._onDisplayOutputChange}
-            aria-label={'Display the query output'}
-            name={'display-output'}
-            defaultChecked={this._displayOutput}
-          />
-        </div>
-      </div>
+      <UseSignal signal={this._variableChanged} initialArgs={this._variable}>
+        {(_, variable) => (
+          <div className={'jp-sqlcell-variable'}>
+            <input
+              type={'text'}
+              placeholder={'Variable name'}
+              onChange={this._onVariableChange}
+              title={'The variable where to copy the cell output'}
+              value={variable?.value}
+            ></input>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <label htmlFor={'display-output'}>Display output</label>
+              <input
+                type={'checkbox'}
+                onChange={this._onDisplayOutputChange}
+                aria-label={'Display the query output'}
+                name={'display-output'}
+                checked={variable?.displayOutput}
+              />
+            </div>
+          </div>
+        )}
+      </UseSignal>
     );
   }
 
   private _cell: ICustomCodeCell;
-  private _value: string;
-  private _displayOutput: boolean;
+  private _variable: MagicLine.IVariable;
+  private _variableChanged: ISignal<ICustomCodeCell, MagicLine.IVariable>;
 }
