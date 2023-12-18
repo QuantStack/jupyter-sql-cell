@@ -30,13 +30,6 @@ export interface IKernelInjection {
    */
   addSessionContext(sessionContext: ISessionContext): void;
   /**
-   * Copy a cell output to a variable in the kernel.
-   *
-   * @param cell - the cell whose copy the output.
-   * @param variable - the name of the variable in the kernel.
-   */
-  outputToVariable(cell: CodeCell, variable: string): void;
-  /**
    * A signal emitted when the status changes.
    */
   readonly statusChanged: ISignal<this, void>;
@@ -80,32 +73,6 @@ export class KernelInjection implements IKernelInjection {
     sessionContext.disposed.connect(sessionContext => {
       sessionContext.kernelChanged.disconnect(this._onKernelChanged, this);
     });
-  }
-
-  /**
-   * Copy a cell output to a variable in the kernel.
-   *
-   * @param cell - the cell whose copy the output.
-   * @param variable - the name of the variable in the kernel.
-   */
-  outputToVariable(cell: CodeCell, variable: string) {
-    const sessionContext = ((cell.parent as Notebook)?.parent as NotebookPanel)
-      ?.sessionContext;
-    if (
-      sessionContext &&
-      this._status.get(sessionContext) &&
-      cell.model.executionCount
-    ) {
-      const kernel = sessionContext.session?.kernel;
-      if (kernel) {
-        const code = `${variable} = _${cell.model.executionCount}`;
-        this._runCode(kernel, code).then(reply => {
-          if (reply?.content.status !== 'ok') {
-            console.warn('Error while copying the SQL output to variable');
-          }
-        });
-      }
-    }
   }
 
   /**

@@ -43,6 +43,12 @@ ul.jp-sqlcell-column-items {
 }
 
 /* stylelint-disable-next-line selector-class-pattern */
+.jp-sqlcell-header .jp-Toolbar .jp-sqlcell-variable {
+  display: flex;
+  align-items: center;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
 .jp-sqlcell-header .jp-Toolbar input {
-  height: 50%;
+  height: 63%;
 }

@@ -1,6 +1,5 @@
 import { CellChange, ISharedCodeCell } from '@jupyter/ydoc';
-import { Cell, CodeCell, ICellHeader, ICellModel } from '@jupyterlab/cells';
-import { IChangedArgs } from '@jupyterlab/coreutils';
+import { Cell, CodeCell, ICellHeader } from '@jupyterlab/cells';
 import { Notebook, NotebookPanel } from '@jupyterlab/notebook';
 import { ReactiveToolbar } from '@jupyterlab/ui-components';
 import { Message } from '@lumino/messaging';
@@ -103,20 +102,17 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
   }
 
   /**
-   * Getter and setter of the name of the variable to copy the cell output to.
+   * A signal emitted when the first line changed.
    */
-  get variable(): string | null {
-    return this._variable;
-  }
-  set variable(name: string | null) {
-    this._variable = name;
+  get databaseChanged(): ISignal<ICustomCodeCell, string> {
+    return this._databaseChanged;
   }
 
   /**
    * A signal emitted when the first line changed.
    */
-  get databaseChanged(): ISignal<ICustomCodeCell, string> {
-    return this._databaseChanged;
+  get variableChanged(): ISignal<ICustomCodeCell, MagicLine.IVariable> {
+    return this._variableChanged;
   }
 
   protected initializeDOM(): void {
@@ -127,21 +123,6 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
 
     this._header.createToolbar(this);
     this._checkSource();
-  }
-
-  protected onStateChanged(
-    model: ICellModel,
-    args: IChangedArgs<any, any, string>
-  ): void {
-    super.onStateChanged(model, args);
-    if (
-      args.name === 'executionCount' &&
-      args.newValue &&
-      this._isSQL &&
-      this._variable
-    ) {
-      this._kernelInjection.outputToVariable(this, this._variable);
-    }
   }
 
   /**
@@ -186,6 +167,9 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
             this._databasePanel.databases.find(db => db.url === databaseURL)
               ?.alias ?? ' - ';
           this._databaseChanged.emit(databaseAlias);
+
+          const variable = MagicLine.getVariable(this.model);
+          this._variableChanged.emit(variable);
         }
       }
     }
@@ -194,9 +178,11 @@ class CustomCodeCell extends CodeCell implements ICustomCodeCell {
   private _header: CellHeader | undefined = undefined;
   private _kernelInjection: IKernelInjection;
   private _databasePanel: IDatabasesPanel;
-  private _variable: string | null = null;
   private _isSQL = false;
   private _databaseChanged = new Signal<ICustomCodeCell, string>(this);
+  private _variableChanged = new Signal<ICustomCodeCell, MagicLine.IVariable>(
+    this
+  );
 }
 
 /**
@@ -287,7 +273,10 @@ export class CellHeader extends Widget implements ICellHeader {
 
     this._toolbar.addItem('select', databaseSelect);
 
-    const variableName = new VariableName({ cell });
+    const variableName = new VariableName({
+      cell,
+      variableChanged: cell.variableChanged
+    });
     this._toolbar.addItem('variable', variableName);
   }
 
